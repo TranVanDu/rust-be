@@ -1,0 +1,21 @@
+[package]
+name = "core_app"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+axum = { version = "0.8.1", features = ["tracing"] }
+dotenv = "0.15.0"
+serde = { version = "1.0.217", features = ["derive"] }
+serde_json = "1.0.135"
+sqlx = { version = "0.8.3", features = [
+  "postgres",
+  "runtime-tokio-native-tls",
+] }
+thiserror = "2.0.11"
+tracing.workspace = true
+modql.workspace = true
+sea-query.workspace = true
+strum_macros = "0.27.1"
+config.workspace = true
+async-trait = "0.1"

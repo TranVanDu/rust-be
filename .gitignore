@@ -1,0 +1,7 @@
+/target
+/.env
+/logs
+/crates/logs/
+/crates/app/target/
+/.vscode
+

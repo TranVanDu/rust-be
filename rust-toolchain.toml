@@ -1,0 +1,5 @@
+[toolchain]
+channel = "stable"          # Hoặc "beta", "nightly", hoặc một phiên bản cụ thể như "1.72.0"
+components = ["rustfmt", "clippy"]    # Các thành phần bổ sung như rustfmt, clippy, v.v.
+#targets = ["x86_64-unknown-linux-gnu"] # Các mục tiêu biên dịch
+#profile = "minimal"         # Hồ sơ cài đặt: "minimal", "default", hoặc "complete"
