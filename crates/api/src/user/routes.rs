@@ -1,12 +1,14 @@
+use std::sync::Arc;
+
 use axum::{
   Router,
   routing::{delete, get, patch, post},
 };
-use sqlx::PgPool;
+use core_app::AppState;
 
 use super::UserDmc;
 
-pub fn routes() -> Router<PgPool> {
+pub fn routes() -> Router<Arc<AppState>> {
   Router::new()
     .route("/users", post(UserDmc::create_user))
     .route("/users/create-many", post(UserDmc::create_users))

@@ -11,3 +11,7 @@ serde_json = "1.0.135"
 config = { version = "0.15.6" }
 serde = { version = "1.0.217", features = ["derive"] }
 argon2 = "0.5.3"
+regex = "1.11.1"
+chrono = { version = "0.4.34", features = ["serde"] }
+utoipa = { version = "5.3.1", features = ["axum_extras", "uuid", "serde_yaml"] }
+utoipa-swagger-ui = { version = "9.0.1", features = ["axum"] }

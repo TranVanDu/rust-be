@@ -90,10 +90,13 @@ pub enum AppError {
   ListLimitOverMax { max: i64, actual: i64 },
 
   #[error("Unauthorized access")]
-  Unauthorized,
+  Unauthorized(String),
 
   #[error("Permission denied: {0}")]
   Forbidden(String),
+
+  #[error("Invalid Refresh Token")]
+  InvalidRefreshToken,
 
   // Lỗi không mong muốn hoặc chưa được xử lý cụ thể
   #[error("Unhandled internal error: {0}")]
@@ -194,10 +197,10 @@ impl AppError {
         Some(json!(errors)),                   // Specific field errors in details
         LogLevel::Warn,
       ),
-      AppError::Unauthorized => (
+      AppError::Unauthorized(error) => (
         StatusCode::UNAUTHORIZED, // 401
         ErrorCode::Unauthorized,
-        "Authentication required".to_string(),
+        error.to_string(),
         None,
         LogLevel::Info, // Often Info, depends on security policy
       ),
@@ -306,11 +309,11 @@ impl AppError {
         None,
         LogLevel::Error,
       ),
-      AppError::Unhandled(_) => (
+      AppError::Unhandled(err) => (
         // Lỗi không mong muốn
         StatusCode::INTERNAL_SERVER_ERROR,
         ErrorCode::UnhandledError,
-        "An internal server error occurred.".to_string(),
+        err.to_string(),
         None,
         LogLevel::Error,
       ),

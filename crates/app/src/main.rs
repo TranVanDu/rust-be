@@ -1,12 +1,12 @@
 mod trace;
-use api::{app_router, user_router_v1};
+use api::{app_router, router_v1};
 use axum::{
   Router,
   body::Bytes,
   http::{HeaderValue, header},
   middleware,
 };
-use core_app::configs::ProdConfig;
+use core_app::{AppState, configs::ProdConfig};
 use dotenv::dotenv;
 use infra::{
   initialize_db,
@@ -15,7 +15,6 @@ use infra::{
     mw_response_v1::{self, handler_404},
   },
 };
-use sqlx::PgPool;
 use std::{sync::Arc, time::Duration};
 use tower::ServiceBuilder;
 use tower_http::{
@@ -26,17 +25,6 @@ use tower_http::{
 };
 use trace::tracing_init;
 use tracing::info;
-
-#[derive(Clone)]
-pub struct AppState {
-  pub db: PgPool,
-}
-
-impl AppState {
-  pub fn new(db: PgPool) -> Arc<AppState> {
-    Arc::new(Self { db })
-  }
-}
 
 #[tokio::main]
 async fn main() {
@@ -70,18 +58,18 @@ async fn main() {
 
   let configs = ProdConfig::from_env().unwrap();
   let pool = initialize_db(&configs.postgres.dsn, configs.postgres.max_conns).await;
-  let state = AppState::new(pool.clone());
+  let state = AppState::new(pool.clone(), configs.clone());
 
   // build our application with a route
   let app: Router = Router::new()
     .merge(app_router())
-    .merge(user_router_v1())
+    .merge(router_v1())
     .layer(middleware::from_fn(mw_response_v1::mw_response))
     .layer(middleware::from_fn_with_state(state.clone(), mw_auth::mw_auth))
     .layer(CorsLayer::new())
     .layer(middleware)
     .fallback(handler_404)
-    .with_state(pool);
+    .with_state(state);
 
   // run our app with hyper, listening globally on port 3000
   let listener = tokio::net::TcpListener::bind(&configs.web.addr).await.unwrap();

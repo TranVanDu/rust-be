@@ -114,14 +114,11 @@ where
 
   let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-  debug!("Generated SQL: {}", sql);
-  debug!("Query values: {:?}", values);
   let entity = sqlx::query_as_with::<_, O, _>(&sql, values)
     .fetch_optional(db)
     .await?
     .ok_or(AppError::NotFound)?;
 
-  debug!("Generated SQL: {}", sql);
   Ok(entity)
 }
 

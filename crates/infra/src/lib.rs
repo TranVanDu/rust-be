@@ -1,6 +1,7 @@
 use sqlx::{Pool, Postgres, migrate, postgres::PgPoolOptions};
 use tracing::info;
 
+pub mod auth;
 pub mod base;
 pub mod middleware;
 pub mod user;

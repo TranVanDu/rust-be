@@ -17,5 +17,9 @@ chrono = { version = "0.4.34", features = ["serde"] }
 #Member
 utils = { path = "../utils" }
 core_app = { path = "../core_app" }
+
 modql.workspace = true
 sea-query.workspace = true
+regex.workspace = true
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true

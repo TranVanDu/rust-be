@@ -1,18 +1,17 @@
 CREATE SCHEMA IF NOT EXISTS "users";
 
+-- Tạo bảng sử dụng ENUM
 CREATE TABLE IF NOT EXISTS "users"."tbl_users" (
-  -- pk_user_id int(11) NOT NULL AUTO_INCREMENT,
-  -- user_name varchar(255) NOT NULL,
-  -- PRIMARY KEY (pk_user_id)
   pk_user_id BIGSERIAL PRIMARY KEY NOT NULL,
-  user_name VARCHAR(150) NOT NULL,
-  email_address VARCHAR(150) UNIQUE NOT NULL,
+  user_name VARCHAR(150) UNIQUE NOT NULL,
+  email_address VARCHAR(150) UNIQUE,
+  full_name VARCHAR(150),
+  role Text NOT NULL DEFAULT 'USER',
   password_hash VARCHAR(150) NOT NULL, 
   created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
   updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
   is_active BOOLEAN NOT NULL DEFAULT TRUE
 );
-
 
 
 

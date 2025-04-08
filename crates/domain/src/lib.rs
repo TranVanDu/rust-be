@@ -1,5 +1,7 @@
 use serde::Serialize;
+use sqlx::PgPool;
 
+pub mod auth;
 pub mod log;
 pub mod user;
 

@@ -1,92 +1,51 @@
+use crate::errors::AppError;
 use config::ConfigError;
 use dotenv::var;
 use serde::Deserialize;
 
-use crate::errors::AppError;
-
-// cach 1
-pub fn get_dsn() -> String {
-  var("DSN").expect("DSN must be set")
-}
-
-pub fn get_max_connections() -> u32 {
-  var("MAX_CONNS")
-    .expect("MAX_CONNS must be set")
-    .parse::<u32>()
-    .expect("MAX_CONNS must be a number")
-}
-
-pub fn get_port() -> String {
-  var("PORT").expect("PORT must be set")
-}
-
-// cách 2
-
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct WebConfig {
   pub addr: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct PostgresConfig {
   pub dsn: String,
   pub max_conns: u32,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct AppConfig {
   pub web: WebConfig,
   pub postgres: PostgresConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct DevConfig {
   pub devweb: WebConfig,
   pub devpostgres: PostgresConfig,
+  pub jwt_secret_key: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ProdConfig {
   pub web: WebConfig,
   pub postgres: PostgresConfig,
+  pub jwt_secret_key: String,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct DevEnv {
   pub app: DevConfig,
 }
 
-#[derive(Deserialize)]
+#[derive(Deserialize, Clone)]
 pub struct ProdEnv {
   pub app: ProdConfig,
 }
 
 impl ProdConfig {
-  pub fn from_env() -> Result<ProdConfig, ConfigError> {
-    match var("ENV").as_deref() {
-      Ok("prod") => {
-        let config = config::Config::builder()
-          .add_source(config::Environment::default())
-          .build()
-          .expect("Can't read env")
-          .try_deserialize::<ProdEnv>()?;
-
-        Ok(ProdConfig { web: config.app.web, postgres: config.app.postgres })
-      },
-
-      _ => {
-        let config = config::Config::builder()
-          .add_source(config::Environment::default())
-          .build()
-          .expect("Can't read env")
-          .try_deserialize::<DevEnv>()?;
-
-        Ok(ProdConfig { web: config.app.devweb, postgres: config.app.devpostgres })
-      },
-    }
-  }
-
-  pub fn from_env_v1() -> Result<ProdConfig, AppError> {
+  pub fn from_env() -> Result<ProdConfig, AppError> {
     match var("ENV").as_deref() {
       Ok("prod") => {
         let config = config::Config::builder()
@@ -95,7 +54,11 @@ impl ProdConfig {
           .map_err(AppError::Config)?
           .try_deserialize::<ProdEnv>()?;
 
-        Ok(ProdConfig { web: config.app.web, postgres: config.app.postgres })
+        Ok(ProdConfig {
+          web: config.app.web,
+          postgres: config.app.postgres,
+          jwt_secret_key: config.app.jwt_secret_key,
+        })
       },
 
       _ => {
@@ -105,7 +68,11 @@ impl ProdConfig {
           .map_err(AppError::Config)?
           .try_deserialize::<DevEnv>()?;
 
-        Ok(ProdConfig { web: config.app.devweb, postgres: config.app.devpostgres })
+        Ok(ProdConfig {
+          web: config.app.devweb,
+          postgres: config.app.devpostgres,
+          jwt_secret_key: config.app.jwt_secret_key,
+        })
       },
     }
   }
