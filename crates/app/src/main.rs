@@ -1,5 +1,7 @@
+mod api_docs;
 mod trace;
-use api::{app_router, router_v1};
+use api::{app_router, router_v1_private, router_v1_public};
+use api_docs::api_docs_router;
 use axum::{
   Router,
   body::Bytes,
@@ -9,7 +11,7 @@ use axum::{
 use core_app::{AppState, configs::ProdConfig};
 use dotenv::dotenv;
 use infra::{
-  initialize_db,
+  database::Database,
   middleware::{
     mw_auth,
     mw_response_v1::{self, handler_404},
@@ -19,7 +21,8 @@ use std::{sync::Arc, time::Duration};
 use tower::ServiceBuilder;
 use tower_http::{
   LatencyUnit, ServiceBuilderExt,
-  cors::CorsLayer,
+  cors::{Any, CorsLayer},
+  services::ServeDir,
   timeout::TimeoutLayer,
   trace::{DefaultMakeSpan, DefaultOnResponse, TraceLayer},
 };
@@ -57,16 +60,30 @@ async fn main() {
      );
 
   let configs = ProdConfig::from_env().unwrap();
-  let pool = initialize_db(&configs.postgres.dsn, configs.postgres.max_conns).await;
+
+  let pool = Database::initialize_db(&configs.postgres.dsn, configs.postgres.max_conns).await;
   let state = AppState::new(pool.clone(), configs.clone());
+
+  let cors = CorsLayer::new()
+    .allow_origin(Any) // Adjust in production!
+    .allow_methods(Any)
+    .allow_headers(Any);
+
+  let public_router = router_v1_public().with_state(state.clone());
+
+  let private_router = router_v1_private()
+    .layer(middleware::from_fn_with_state(state.clone(), mw_auth::mw_auth))
+    .with_state(state.clone());
 
   // build our application with a route
   let app: Router = Router::new()
     .merge(app_router())
-    .merge(router_v1())
+    .merge(public_router)
+    .merge(private_router)
     .layer(middleware::from_fn(mw_response_v1::mw_response))
-    .layer(middleware::from_fn_with_state(state.clone(), mw_auth::mw_auth))
-    .layer(CorsLayer::new())
+    .nest_service("/static", ServeDir::new("static"))
+    .merge(api_docs_router())
+    .layer(cors)
     .layer(middleware)
     .fallback(handler_404)
     .with_state(state);

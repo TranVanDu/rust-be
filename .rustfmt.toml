@@ -12,7 +12,8 @@ hard_tabs = false
 
 # # Make one line functions in a single line
 fn_single_line = true
-fn_args_layout = "Vertical"
+fn_params_layout = "Vertical"
+
 
 # # Format strings
 format_strings = true
@@ -38,9 +39,7 @@ match_block_trailing_comma = true
 normalize_doc_attributes = true
 error_on_line_overflow = true
 normalize_comments = true
-report_fixme = "Always"
 wrap_comments = true
-todo = "Always"
 
 # Custom
 binop_separator = "Front"

@@ -6,7 +6,7 @@ use axum::{
   response::{IntoResponse, Response},
 };
 use core_app::{AppResult, errors::AppError, response::create_error_response};
-use domain::log::RequestLogLine;
+use domain::entities::common::RequestLogLine;
 use serde_json::{Value, json, to_value};
 use std::sync::Arc;
 use tracing::{debug, error, info};

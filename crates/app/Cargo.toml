@@ -12,7 +12,6 @@ sqlx = { version = "0.8.3", features = [
   "postgres",
   "runtime-tokio-native-tls",
 ] }
-tokio = { version = "1.43.0", features = ["full"] }
 tracing-subscriber = "0.3.19"
 num_cpus = "1.16.0"
 tracing-appender = "0.2.3"
@@ -20,11 +19,13 @@ chrono = "0.4.39"
 
 tracing.workspace = true
 modql.workspace = true
-
-
+utoipa.workspace = true
+utoipa-swagger-ui.workspace = true
+tokio.workspace = true
 #Member
 core_app = { path = "../core_app" }
 infra = { path = "../infra" }
+domain = { path = "../domain" }
 api = { path = "../api" }
 tower-http = { version = "0.6.2", features = ["compression-full", "full"] }
 tower = { version = "0.5.2", features = ["full"] }

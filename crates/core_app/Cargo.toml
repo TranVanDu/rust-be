@@ -19,3 +19,4 @@ sea-query.workspace = true
 strum_macros = "0.27.1"
 config.workspace = true
 async-trait = "0.1"
+jsonwebtoken.workspace = true

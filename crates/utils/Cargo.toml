@@ -7,8 +7,12 @@ edition = "2021"
 argon2 = "0.5.3"
 rand = "0.9.0"
 rand_core = "0.6.4"
+async-trait = "0.1"
+
 serde.workspace = true
 serde_json.workspace = true
-async-trait = "0.1"
+chrono.workspace = true
+jsonwebtoken.workspace = true
+tracing.workspace = true
 #Member
 core_app = { path = "../core_app" }
