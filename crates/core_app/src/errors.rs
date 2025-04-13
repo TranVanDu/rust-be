@@ -98,6 +98,9 @@ pub enum AppError {
   #[error("Invalid Refresh Token")]
   InvalidRefreshToken,
 
+  #[error("JWT error: {0}")]
+  Jwt(#[from] jsonwebtoken::errors::Error),
+
   // Lỗi không mong muốn hoặc chưa được xử lý cụ thể
   #[error("Unhandled internal error: {0}")]
   Unhandled(#[source] Box<dyn std::error::Error + Send + Sync>),
@@ -271,7 +274,7 @@ impl AppError {
           (
             StatusCode::INTERNAL_SERVER_ERROR,
             ErrorCode::DatabaseError, // Still a DB error, but unhandled specifically
-            format!("An internal server error occurred with SQLx: {}", error.to_string()),
+            format!("An internal server error occurred with SQLx: {}", error),
             None,
             LogLevel::Error, // Log as Error because we didn't handle it specifically
           )
@@ -281,7 +284,7 @@ impl AppError {
           (
             StatusCode::INTERNAL_SERVER_ERROR,
             ErrorCode::DatabaseError, // Or a more specific code if identifiable
-            format!("An internal server error occurred with SQLx: {}", error.to_string()),
+            format!("An internal server error occurred with SQLx: {}", error),
             None,
             LogLevel::Error,
           )
@@ -290,14 +293,14 @@ impl AppError {
       AppError::SeaQuery(error) => (
         StatusCode::INTERNAL_SERVER_ERROR,
         ErrorCode::DatabaseError, // Hoặc QueryBuildError nếu muốn
-        format!("An internal server error occurred with SeaQuery: {}", error.to_string()),
+        format!("An internal server error occurred with SeaQuery: {}", error),
         None,
         LogLevel::Error,
       ),
       AppError::ModQlIntoSea(error) => (
         StatusCode::INTERNAL_SERVER_ERROR,
         ErrorCode::DatabaseError, // Hoặc QueryBuildError
-        format!("An internal server error occurred with ModQlIntoSea: {}", error.to_string()),
+        format!("An internal server error occurred with ModQlIntoSea: {}", error),
         None,
         LogLevel::Error,
       ),

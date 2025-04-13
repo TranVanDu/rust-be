@@ -11,7 +11,7 @@ use axum::{
   middleware::Next,
   response::{IntoResponse, Response},
 };
-use domain::log::RequestLogLine;
+use domain::entities::common::RequestLogLine;
 use serde_json::{Value, json};
 use tracing::{Instrument, Span, debug, error, warn};
 use uuid::Uuid;
@@ -30,7 +30,7 @@ pub async fn mw_response(
 
   // Tạo span cho tracing với request_id
   let span = Span::current(); // Hoặc tạo span mới: tracing::info_span!("request", %req_method, %req_uri, %request_id);
-  span.record("request_id", &request_id.to_string());
+  span.record("request_id", request_id.to_string());
 
   // Gắn request_id vào extensions để các lớp sau (handler, IntoResponse) có thể dùng nếu cần
   // Mặc dù trong thiết kế này, middleware sẽ thêm nó vào cuối cùng

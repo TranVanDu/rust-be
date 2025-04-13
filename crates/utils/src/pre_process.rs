@@ -6,3 +6,9 @@ use core_app::AppResult;
 pub trait PreProcess {
   async fn pre_process(&mut self) -> AppResult<()>;
 }
+
+#[async_trait]
+pub trait PreProcessR {
+  type Output;
+  async fn pre_process_r(self) -> AppResult<Self::Output>;
+}
