@@ -27,3 +27,12 @@ pub struct TwilioSms {
   #[serde(rename = "Body")]
   pub body: String,
 }
+
+#[derive(Default)]
+
+pub struct UpdateProfileImageParams {
+  pub content_type: String,
+  pub max_file_size: usize,
+  pub max_width: u32,
+  pub quality: u8,
+}

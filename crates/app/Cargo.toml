@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8.1"
 dotenv = "0.15.0"
 serde = { version = "1.0.217", features = ["derive"] }
 serde_json = "1.0.135"
@@ -22,10 +21,11 @@ modql.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 tokio.workspace = true
+axum = { workspace = true }
+tower-http.workspace = true
+tower.workspace = true
 #Member
 core_app = { path = "../core_app" }
 infra = { path = "../infra" }
 domain = { path = "../domain" }
 api = { path = "../api" }
-tower-http = { version = "0.6.2", features = ["compression-full", "full"] }
-tower = { version = "0.5.2", features = ["full"] }

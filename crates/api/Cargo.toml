@@ -4,7 +4,6 @@ version = "0.1.0"
 edition = "2021"
 
 [dependencies]
-axum = "0.8.1"
 serde = { version = "1.0.217", features = ["derive"] }
 sqlx = { version = "0.8.3", features = [
   "postgres",
@@ -17,9 +16,14 @@ modql.workspace = true
 serde_json.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
+axum = { workspace = true }
+tokio.workspace = true
+tower-http.workspace = true
+futures.workspace = true
 
 #Member
 core_app = { path = "../core_app" }
 infra = { path = "../infra" }
 domain = { path = "../domain" }
 utils = { path = "../utils" }
+tokio-util = { version = "0.7.15", features = ["io"] }

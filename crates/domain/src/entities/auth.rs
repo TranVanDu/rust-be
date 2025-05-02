@@ -30,7 +30,6 @@ pub struct Claims {
 pub struct ClaimsSetPassword {
   pub sub: String, // Subject (user ID)
   pub phone: String,
-  pub code: String,
   pub exp: usize, // Expiration time (Unix timestamp)
 }
 
@@ -96,7 +95,8 @@ pub struct VerifyPhoneCodeResponse {
   pub token: String,
   pub user_id: i64,
   pub phone: String,
-  pub code: String,
+  #[serde(default)]
+  pub code: Option<String>,
   pub is_active: bool,
   pub is_verify: bool,
 }
@@ -105,11 +105,26 @@ pub struct VerifyPhoneCodeResponse {
 pub struct SetPasswordRequest {
   pub phone: String,
   pub password: String,
-  pub user_id: String,
+  pub user_id: i64,
   pub token: String,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]
 pub struct ForgotPasswordRequest {
   pub phone: String,
+}
+
+#[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]
+pub struct ResendCodeRequest {
+  pub phone: String,
+}
+
+#[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]
+pub struct VerifyFireCodeRequest {
+  pub phone: String,
+}
+
+#[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]
+pub struct LogoutRequest {
+  pub refresh_token: Option<String>,
 }

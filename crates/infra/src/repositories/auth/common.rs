@@ -6,7 +6,7 @@ use crate::{
 use chrono::{DateTime, Duration, Utc};
 use core_app::{AppResult, AppState, errors::AppError};
 use domain::entities::{
-  auth::{Claims, PhoneCodeRequest},
+  auth::{Claims, PhoneCode, PhoneCodeRequest},
   user::{User, UserWithPassword},
 };
 use modql::filter::{FilterGroups, FilterNode, OpValBool, OpValInt64};
@@ -159,6 +159,33 @@ pub async fn handle_phone_code(
   state: Arc<AppState>,
   input: PhoneCodeRequest,
 ) -> AppResult<()> {
+  // 1. Xóa tất cả mã hết hạn của user này trước
+  sqlx::query(
+    r#"DELETE FROM users.phone_codes 
+           WHERE user_id = $1 AND phone = $2 AND expires_at < NOW()"#,
+  )
+  .bind(input.user_id)
+  .bind(&input.phone)
+  .execute(&state.db)
+  .await
+  .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+  // 2. Kiểm tra xem còn mã nào chưa hết hạn không
+  let existing_active_code = sqlx::query_as::<_, PhoneCode>(
+    r#"SELECT * FROM users.phone_codes 
+           WHERE user_id = $1 AND revoked = FALSE AND phone = $2"#,
+  )
+  .bind(input.user_id)
+  .bind(&input.phone)
+  .fetch_optional(&state.db)
+  .await
+  .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+  // 3. Nếu đã có mã active thì không tạo mới
+  if existing_active_code.is_some() {
+    return Ok(());
+  }
+
   let code = generate_phone_code();
 
   sqlx::query(
@@ -176,9 +203,9 @@ pub async fn handle_phone_code(
   .map(|_| ()) // Discard the result count
   .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
-  send_sms_via_twilio(state, input.phone.as_ref(), code.as_ref())
-    .await
-    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+  // send_sms_via_twilio(state, input.phone.as_ref(), code.as_ref())
+  //   .await
+  //   .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
   Ok(())
 }
@@ -256,6 +283,42 @@ pub async fn remove_phone_codes(
   Ok(())
 }
 
+pub async fn remove_phone_codes_by_phone(
+  state: Arc<AppState>,
+  phone: String,
+) -> AppResult<()> {
+  sqlx::query(
+    r#"
+      DELETE FROM users.phone_codes
+      WHERE phone = $1 AND revoked = FALSE
+    "#,
+  )
+  .bind(phone)
+  .execute(&state.db)
+  .await
+  .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+  Ok(())
+}
+
+pub async fn remove_phone_codes_by_id(
+  state: &Arc<AppState>,
+  id: i64,
+) -> AppResult<()> {
+  sqlx::query(
+    r#"
+      DELETE FROM users.phone_codes
+      WHERE id = $1 AND revoked = FALSE
+    "#,
+  )
+  .bind(id)
+  .execute(&state.db)
+  .await
+  .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+  Ok(())
+}
+
 pub async fn remove_refresh_token(
   state: Arc<AppState>,
   token: &str,
@@ -272,4 +335,23 @@ pub async fn remove_refresh_token(
   .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
   Ok(())
+}
+
+pub async fn get_phone_code_lastest(
+  state: &Arc<AppState>,
+  phone: String,
+) -> AppResult<Option<PhoneCode>> {
+  let phone_code = sqlx::query_as::<_, PhoneCode>(
+    r#"
+      SELECT * FROM users.phone_codes
+      WHERE phone = $1
+      ORDER BY created_at DESC
+      LIMIT 1
+    "#,
+  )
+  .bind(phone)
+  .fetch_optional(&state.db)
+  .await?;
+
+  Ok(phone_code)
 }

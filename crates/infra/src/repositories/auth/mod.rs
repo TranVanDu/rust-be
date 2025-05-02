@@ -1,19 +1,21 @@
 use super::base::create;
 use crate::database::schema::{DB, UserDmc};
+use axum::extract::Request;
 use chrono::{Duration, Utc};
 use common::{
-  generate_auth_tokens, get_active_user, get_user, handle_phone_code, remove_phone_codes,
-  remove_refresh_token, store_refresh_token, update_user_password,
+  generate_auth_tokens, get_active_user, get_phone_code_lastest, get_user, handle_phone_code,
+  remove_phone_codes, remove_phone_codes_by_id, remove_refresh_token, store_refresh_token,
+  update_user_password,
 };
 use core_app::{AppResult, AppState, errors::AppError};
 use domain::entities::{
   auth::{
     CheckPhoneReponse, CheckPhoneRequest, Claims, ClaimsSetPassword, ForgotPasswordRequest,
-    PhoneCode, PhoneCodeRequest, RefreshToken, RefreshTokenRequest, SetPasswordRequest,
-    SigninRequest, SigninRequestByPhone, SigninResponse, VerifyPhoneCodeRequest,
-    VerifyPhoneCodeResponse,
+    LogoutRequest, PhoneCode, PhoneCodeRequest, RefreshToken, RefreshTokenRequest,
+    ResendCodeRequest, SetPasswordRequest, SigninRequest, SigninRequestByPhone, SigninResponse,
+    VerifyFireCodeRequest, VerifyPhoneCodeRequest, VerifyPhoneCodeResponse,
   },
-  user::{RequestCreateUser, Role, User},
+  user::{RequestCreateUser, Role, User, UserWithPassword},
 };
 use modql::filter::{FilterNode, OpValInt64, OpValString};
 use std::sync::Arc;
@@ -172,6 +174,8 @@ pub async fn check_phone(
         full_name: None,
         phone: Some(req.phone.clone()),
         password_hash: None,
+        address: None,
+        date_of_birth: None,
         role: Role::CUSTOMER,
         is_verify: Some(false),
         is_active: Some(true),
@@ -230,7 +234,6 @@ pub async fn verify_phone(
   let access_claims = ClaimsSetPassword {
     sub: user.pk_user_id.to_string(),
     phone: req.phone.clone(),
-    code: req.code.clone(),
     exp: (Utc::now() + access_duration).timestamp() as usize,
   };
   let access_token = encode_token(&access_claims, &state.config.jwt_secret_key)?;
@@ -246,7 +249,7 @@ pub async fn verify_phone(
     user_id: user.pk_user_id,
     token: access_token,
     phone: req.phone,
-    code: req.code,
+    code: Some(req.code),
     is_active: user.is_active,
     is_verify: user.is_verify,
   })
@@ -313,6 +316,10 @@ pub async fn forgot_password(
   let user: domain::entities::user::UserWithPassword =
     get_user::<UserDmc>(&state.db, filter, AppError::BadRequest("User not found".to_string()))
       .await?;
+
+  if !user.is_active {
+    return Ok(false);
+  }
   let state_clone = state.clone();
   tokio::spawn(async move {
     tokio::time::sleep(std::time::Duration::from_secs(3)).await;
@@ -325,6 +332,108 @@ pub async fn forgot_password(
       error!("Failed to send verification code: {}", e);
     }
   });
+
+  Ok(true)
+}
+
+pub async fn resend_code(
+  state: Arc<AppState>,
+  req: ResendCodeRequest,
+) -> AppResult<bool> {
+  let filter: FilterNode = ("phone", OpValString::Eq(req.phone.clone())).into();
+  let user: domain::entities::user::UserWithPassword =
+    get_user::<UserDmc>(&state.db, filter, AppError::BadRequest("User not found".to_string()))
+      .await?;
+  let state_clone = state.clone();
+
+  if !user.is_active {
+    return Ok(false);
+  }
+
+  if let Some(phone) = get_phone_code_lastest(&state_clone, req.phone.clone()).await? {
+    if phone.expires_at > Utc::now() {
+      return Ok(false);
+    } else {
+      remove_phone_codes_by_id(&state_clone, phone.id).await.unwrap();
+    }
+  }
+
+  tokio::spawn(async move {
+    tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+    if let Err(e) = handle_phone_code(state_clone, PhoneCodeRequest {
+      phone: req.phone.clone(),
+      user_id: user.pk_user_id,
+    })
+    .await
+    {
+      error!("Failed to send verification code: {}", e);
+    }
+  });
+
+  Ok(true)
+}
+
+pub async fn verify_code_firebase(
+  state: Arc<AppState>,
+  req: VerifyFireCodeRequest,
+) -> AppResult<VerifyPhoneCodeResponse> {
+  let filter: FilterNode = ("phone", OpValString::Eq(req.phone.clone())).into();
+  let user: domain::entities::user::UserWithPassword = get_active_user::<UserDmc>(
+    &state.db,
+    filter,
+    AppError::BadRequest("User not found".to_string()),
+  )
+  .await?;
+
+  let access_duration = Duration::minutes(state.config.access_token_set_password_minutes);
+  let access_claims = ClaimsSetPassword {
+    sub: user.pk_user_id.to_string(),
+    phone: req.phone.clone(),
+    exp: (Utc::now() + access_duration).timestamp() as usize,
+  };
+  let access_token = encode_token(&access_claims, &state.config.jwt_secret_key)?;
+
+  Ok(VerifyPhoneCodeResponse {
+    user_id: user.pk_user_id,
+    token: access_token,
+    phone: req.phone,
+    is_active: user.is_active,
+    is_verify: user.is_verify,
+    code: None,
+  })
+}
+
+pub async fn get_current_user(request: Request) -> AppResult<User> {
+  let user_with_password = request
+    .extensions()
+    .get::<UserWithPassword>()
+    .ok_or(AppError::Unauthorized("User not found".to_string()))?;
+
+  let user = User::from(user_with_password.clone());
+
+  Ok(user)
+}
+
+pub async fn logout_user(
+  state: Arc<AppState>,
+  user: UserWithPassword,
+  req: LogoutRequest,
+) -> AppResult<bool> {
+  let user_id = user.pk_user_id;
+
+  if let Some(refresh_token) = req.refresh_token {
+    if !refresh_token.is_empty() {
+      tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        sqlx::query(r#"DELETE FROM users.refresh_tokens WHERE token = $1 and user_id = $2"#)
+          .bind(refresh_token)
+          .bind(user_id)
+          .execute(&state.db)
+          .await
+          .unwrap();
+      });
+    }
+  }
 
   Ok(true)
 }

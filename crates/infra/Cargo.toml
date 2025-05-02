@@ -11,7 +11,7 @@ sqlx = { version = "0.8.3", features = [
   "uuid",
   "chrono",
 ] }
-axum = { version = "0.8.1", features = ["tracing"] }
+
 sea-query-binder = { version = "0.7.0", features = ["sqlx-postgres"] }
 uuid = { version = "1.14.0", features = ["v4"] }
 serde_json = "1.0.139"
@@ -29,3 +29,7 @@ async-trait.workspace = true
 jsonwebtoken.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
+axum.workspace = true
+image.workspace = true
+turbojpeg.workspace = true
+fast_image_resize = "5.1.3"

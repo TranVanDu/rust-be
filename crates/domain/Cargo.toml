@@ -23,3 +23,5 @@ sea-query.workspace = true
 regex.workspace = true
 utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
+tracing.workspace = true
+tokio.workspace = true

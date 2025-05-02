@@ -53,7 +53,7 @@ async fn main() {
              .latency_unit(LatencyUnit::Millis)
          ))
      .sensitive_response_headers(sensitive_headers)
-     .layer(TimeoutLayer::new(Duration::from_secs(10)))
+     .layer(TimeoutLayer::new(Duration::from_secs(60)))
      .compression()
      .insert_response_header_if_not_present(
        header::CONTENT_TYPE, HeaderValue::from_static("application/octet-stream")
@@ -81,8 +81,8 @@ async fn main() {
     .merge(public_router)
     .merge(private_router)
     .layer(middleware::from_fn(mw_response_v1::mw_response))
-    .nest_service("/static", ServeDir::new("static"))
     .merge(api_docs_router())
+    .nest_service("/static", ServeDir::new("static"))
     .layer(cors)
     .layer(middleware)
     .fallback(handler_404)

@@ -41,7 +41,7 @@ pub async fn mw_auth(
 
   let user = get_user_by_id(state, user_id).await?;
   debug!("->> MIDDLEWARE AUTH, user ={:?}", user);
-  request.extensions_mut().insert(User::from(user));
+  request.extensions_mut().insert(user);
 
   // Inside mw_auth, after decoding token_data
   let role = match token_data.claims.role.as_str() {

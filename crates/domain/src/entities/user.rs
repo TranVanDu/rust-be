@@ -10,7 +10,7 @@ use sqlx::{FromRow, Type};
 use utils::deserialize::trim_option_string;
 use utoipa::{IntoParams, ToSchema};
 
-#[derive(Deserialize, ToSchema)]
+#[derive(Deserialize, ToSchema, Debug)]
 pub struct RequestGetUser {
   pub id: i64,
 }
@@ -25,6 +25,9 @@ pub struct User {
   pub phone: Option<String>,
   pub is_active: bool,
   pub is_verify: bool,
+  pub date_of_birth: Option<String>,
+  pub address: Option<String>,
+  pub avatar: Option<String>,
 }
 
 #[derive(FromRow, Debug, Fields, Clone)]
@@ -38,6 +41,9 @@ pub struct UserWithPassword {
   pub is_active: bool,
   pub is_verify: bool,
   pub password_hash: Option<String>,
+  pub date_of_birth: Option<String>,
+  pub address: Option<String>,
+  pub avatar: Option<String>,
 }
 
 // Chuyển từ UserWithPassword sang User (loại bỏ password_hash)
@@ -52,6 +58,9 @@ impl From<UserWithPassword> for User {
       full_name: user_with_pw.full_name,
       is_active: user_with_pw.is_active,
       is_verify: user_with_pw.is_verify,
+      date_of_birth: user_with_pw.date_of_birth,
+      address: user_with_pw.address,
+      avatar: user_with_pw.avatar,
     }
   }
 }
@@ -73,6 +82,10 @@ pub struct RequestUpdateUser {
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub phone: Option<String>,
+  #[serde(default)]
+  #[serde(deserialize_with = "trim_option_string")]
+  pub address: Option<String>,
+  pub date_of_birth: Option<String>,
 }
 
 #[derive(Deserialize, FromRow, Fields, Serialize, ToSchema)]
@@ -95,6 +108,10 @@ pub struct RequestCreateUser {
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub phone: Option<String>,
+  #[serde(default)]
+  #[serde(deserialize_with = "trim_option_string")]
+  pub address: Option<String>,
+  pub date_of_birth: Option<String>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone, IntoParams, ToSchema)]

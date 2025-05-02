@@ -2,11 +2,6 @@ use std::sync::Arc;
 
 use axum::Router;
 use core_app::AppState;
-use domain::entities::{
-  auth::{Claims, RefreshTokenRequest, SigninRequest, SigninResponse},
-  chat::{Chat, GetMessagesRequest, SendMessageRequest, SendMessageResponse},
-  user::{RequestUpdateUser, Role, User},
-};
 use utoipa::{openapi::security::{HttpAuthScheme, HttpBuilder, SecurityScheme}, Modify, OpenApi};
 use utoipa_swagger_ui::SwaggerUi;
 
@@ -24,6 +19,20 @@ use utoipa_swagger_ui::SwaggerUi;
     api::auth::services::verify_phone_code,
     api::auth::services::set_password_service,
     api::auth::services::forgot_password_service,
+    api::auth::services::resend_code_service,
+    api::auth::services::verify_code_firebase_service,
+    api::auth::services::get_current_user_service,
+    api::auth::services::logout_user_service,
+
+
+    //profile
+    api::profile::services::change_password,
+    api::profile::services::logout_user_service,
+    api::profile::services::get_current_user,
+    api::profile::services::update_profile_service,
+    api::profile::services::change_avatar_service,
+
+
     //user
     api::macro_service::user_macro::create,
     api::macro_service::user_macro::list,
@@ -33,22 +42,9 @@ use utoipa_swagger_ui::SwaggerUi;
     api::macro_service::user_macro::delete_item
     
   ),
-  components(schemas(
-    SigninResponse,
-    SigninRequest,
-    RefreshTokenRequest,
-    RequestUpdateUser,
-    Role,
-    Claims,
-    User,
-    // chat
-    Chat,
-    SendMessageRequest,
-    SendMessageResponse,
-    GetMessagesRequest
-  )),
   tags(
     (name = "Auth Service", description = "Auth service endpoints"),
+    (name = "Profile Service", description = "Profile service endpoints"),
     (name = "Chat Service", description = "Chat service endpoints"),
     (name = "User Service", description = "User service endpoints")
   ),
