@@ -1,5 +1,5 @@
 pub mod macros_untils;
-
+use crate::database::schema::DB;
 use core_app::{AppResult, errors::AppError};
 use domain::entities::common::PaginationMetadata;
 use modql::{
@@ -12,16 +12,14 @@ use sea_query_binder::SqlxBinder;
 use sqlx::{FromRow, PgPool, postgres::PgRow};
 use tracing::debug;
 
-use crate::database::schema::DB;
-
 #[derive(Iden)]
 pub enum CommonId {
   PkUserId,
   PkCourseId,
 }
 
-const LIST_LIMIT_DEFAULT: i64 = 10;
-const LIST_LIMIT_MAX: i64 = 500;
+pub const LIST_LIMIT_DEFAULT: i64 = 10;
+pub const LIST_LIMIT_MAX: i64 = 500;
 
 pub async fn create<DMC, I, O>(
   db: &PgPool,
@@ -264,7 +262,7 @@ where
   let sea_values: Vec<_> = fields.for_sea_update().collect();
 
   if sea_values.is_empty() {
-    return Err(AppError::BadRequest(String::from("eror")));
+    return Err(AppError::BadRequest(String::from("error")));
   }
 
   let mut query = Query::update();

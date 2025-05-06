@@ -32,6 +32,14 @@ use utoipa_swagger_ui::SwaggerUi;
     api::profile::services::update_profile_service,
     api::profile::services::change_avatar_service,
 
+    //services
+    api::service::services::get_all_services,
+    api::service::services::get_services,
+    api::service::services::get_service,
+    api::service::services::create_service,
+    api::service::services::update_service,
+    api::service::services::delete_service,
+
 
     //user
     api::macro_service::user_macro::create,
@@ -45,8 +53,10 @@ use utoipa_swagger_ui::SwaggerUi;
   tags(
     (name = "Auth Service", description = "Auth service endpoints"),
     (name = "Profile Service", description = "Profile service endpoints"),
+    (name = "Services", description = "Service endpoints"),
+    (name = "User Service", description = "User service endpoints"),
     (name = "Chat Service", description = "Chat service endpoints"),
-    (name = "User Service", description = "User service endpoints")
+    
   ),
   security(
     ("BearerAuth" = [])

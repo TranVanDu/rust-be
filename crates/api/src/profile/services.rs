@@ -1,5 +1,3 @@
-use std::sync::Arc;
-// use axum::{Json, extract::{State, Multipart}};
 use axum::{
   Extension, Json,
   extract::{Multipart, State},
@@ -14,7 +12,7 @@ use domain::{
   services::profile::ProfileUseCase,
 };
 use infra::repositories::{image::LocalImageService, profile::SqlxProfileRepository};
-use tracing::info;
+use std::sync::Arc;
 
 #[utoipa::path(
     post,
@@ -137,7 +135,7 @@ pub async fn change_avatar_service(
 
   // Trích xuất dữ liệu từ multipart form
   while let Some(field) =
-    multipart.next_field().await.map_err(|err| AppError::BadRequest("sdsdsdsds".to_string()))?
+    multipart.next_field().await.map_err(|err| AppError::BadRequest(err.to_string()))?
   {
     let name = field.name().ok_or(AppError::BadRequest("Missing field name".to_string()))?;
     if name != "image" {
@@ -158,8 +156,6 @@ pub async fn change_avatar_service(
   let image_data = image_data.ok_or(AppError::BadRequest("No image file provided".to_string()))?;
   let content_type =
     content_type.ok_or(AppError::BadRequest("Missing content type".to_string()))?;
-
-  info!("{} {} sdjshdjshjdhsjdhjshdjshdjshjdhsj", content_type, image_data.len());
 
   let user = ProfileUseCase::update_profile_image(
     &profile_repo,

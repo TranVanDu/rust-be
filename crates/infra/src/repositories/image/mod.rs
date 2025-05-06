@@ -5,7 +5,7 @@ use domain::repositories::image_repository::ImageRepository;
 use fast_image_resize::images::Image;
 use fast_image_resize::{PixelType, ResizeOptions, Resizer};
 use image::codecs::jpeg::JpegEncoder;
-use image::{DynamicImage, GenericImageView, ImageFormat, imageops};
+use image::{DynamicImage, GenericImageView, ImageFormat};
 use std::io::Cursor;
 use std::path::Path;
 use std::sync::Arc;
@@ -28,6 +28,7 @@ impl ImageRepository for LocalImageService {
     max_file_size: usize, // Kích thước tối đa (bytes)
     max_width: u32,       // Chiều rộng tối đa để resize
     quality: u8,          // Chất lượng ảnh (0-100)
+    sub_dir: &str,        // Thư mục con trong uploads/ (ví dụ: "avatar", "service")
   ) -> AppResult<String> {
     // Kiểm tra kích thước file
     let start = Instant::now();
@@ -43,7 +44,10 @@ impl ImageRepository for LocalImageService {
     let extension = match content_type {
       "image/jpeg" => "jpg",
       "image/png" => "png",
-      _ => return Err(AppError::BadRequest("Only JPG and PNG files are allowed".to_string())),
+      "image/webp" => "webp",
+      _ => {
+        return Err(AppError::BadRequest("Only JPG, PNG and WebP files are allowed".to_string()));
+      },
     };
     tracing::info!("Processing {} file, size: {} bytes", content_type, data.len());
 
@@ -83,13 +87,13 @@ impl ImageRepository for LocalImageService {
       })
       .await
       .map_err(|err| AppError::BadRequest(format!("Failed to spawn blocking task: {}", err)))??,
-      "image/png" => tokio::task::spawn_blocking({
+      "image/png" | "image/webp" => tokio::task::spawn_blocking({
         let data = Arc::clone(&data);
         move || {
           let decode_start = Instant::now();
           let img = image::load_from_memory(&data)
-            .map_err(|err| AppError::BadRequest(format!("Failed to load PNG: {}", err)))?;
-          tracing::info!("PNG decode time: {:?}", decode_start.elapsed());
+            .map_err(|err| AppError::BadRequest(format!("Failed to load image: {}", err)))?;
+          tracing::info!("Image decode time: {:?}", decode_start.elapsed());
           Ok::<_, AppError>(img)
         }
       })
@@ -182,6 +186,19 @@ impl ImageRepository for LocalImageService {
       })
       .await
       .map_err(|err| AppError::BadRequest(format!("Failed to spawn blocking task: {}", err)))??,
+      "webp" => tokio::task::spawn_blocking({
+        let resized_img = resized_img.clone();
+        move || -> AppResult<Vec<u8>> {
+          let mut buffer = Vec::new();
+          let mut cursor = Cursor::new(&mut buffer);
+          resized_img
+            .write_to(&mut cursor, ImageFormat::WebP)
+            .map_err(|err| AppError::BadRequest(format!("Failed to encode WebP image: {}", err)))?;
+          Ok(buffer)
+        }
+      })
+      .await
+      .map_err(|err| AppError::BadRequest(format!("Failed to spawn blocking task: {}", err)))??,
       _ => unreachable!(),
     };
     tracing::info!("Encode image took: {:?}", encode_start.elapsed());
@@ -193,18 +210,20 @@ impl ImageRepository for LocalImageService {
     }
     tracing::info!("Encoded image buffer size: {} bytes", buffer.len());
 
-    // Tạo thư mục uploads/ nếu chưa tồn tại
+    // Tạo thư mục uploads/ và thư mục con nếu chưa tồn tại
     let io_start = Instant::now();
-    let uploads_dir = Path::new("uploads");
+    let uploads_dir = Path::new("uploads").join(sub_dir);
     if !uploads_dir.exists() {
-      fs::create_dir_all(uploads_dir).await.map_err(|err| AppError::BadRequest(err.to_string()))?;
+      fs::create_dir_all(&uploads_dir)
+        .await
+        .map_err(|err| AppError::BadRequest(err.to_string()))?;
     }
 
     // Tạo tên file duy nhất
     let file_name = format!("{}-{}.{}", user_id, Uuid::new_v4(), extension);
     let file_path = uploads_dir.join(&file_name);
 
-    // Lưu ảnh đã resize vào thư mục uploads/
+    // Lưu ảnh đã resize vào thư mục uploads/sub_dir
     let mut file =
       fs::File::create(&file_path).await.map_err(|err| AppError::BadRequest(err.to_string()))?;
     file.write_all(&buffer).await.map_err(|err| AppError::BadRequest(err.to_string()))?;

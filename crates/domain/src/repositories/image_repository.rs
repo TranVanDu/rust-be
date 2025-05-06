@@ -11,6 +11,7 @@ pub trait ImageRepository: Send + Sync {
     max_file_size: usize, // Kích thước tối đa (bytes)
     max_width: u32,       // Chiều rộng tối đa để resize
     quality: u8,          // Chất lượng ảnh (0-100)
+    sub_dir: &str,        // Thư mục con trong uploads/ (ví dụ: "avatar", "service")
   ) -> AppResult<String>;
 
   /// Xóa file ảnh cũ nếu tồn tại

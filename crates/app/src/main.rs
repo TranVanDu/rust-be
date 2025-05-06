@@ -82,7 +82,7 @@ async fn main() {
     .merge(private_router)
     .layer(middleware::from_fn(mw_response_v1::mw_response))
     .merge(api_docs_router())
-    .nest_service("/static", ServeDir::new("static"))
+    .nest_service("/uploads", ServeDir::new("uploads"))
     .layer(cors)
     .layer(middleware)
     .fallback(handler_404)

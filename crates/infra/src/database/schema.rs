@@ -31,3 +31,11 @@ impl DB for PhoneCodeDmc {
   const TABLE: &'static str = "phone_codes";
   const ID_COLUMN: &'static str = "id";
 }
+
+pub struct ServiceDmc;
+
+impl DB for ServiceDmc {
+  const SCHEMA: &'static str = "users";
+  const TABLE: &'static str = "services";
+  const ID_COLUMN: &'static str = "id";
+}

@@ -2,7 +2,6 @@ use chrono::{NaiveDate, Utc};
 use core_app::{AppResult, errors::AppError};
 use regex::Regex;
 use std::sync::Arc;
-use tracing::info;
 
 use crate::{
   entities::{
@@ -124,6 +123,7 @@ impl ProfileUseCase {
         MAX_FILE_SIZE,
         MAX_WIDTH,
         QUALITY,
+        "avatars",
       )
       .await?;
 

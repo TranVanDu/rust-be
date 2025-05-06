@@ -6,10 +6,6 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-sqlx = { version = "0.8.3", features = [
-  "postgres",
-  "runtime-tokio-native-tls",
-] }
 thiserror = "1.0.56"
 async-trait = "0.1"
 chrono = { version = "0.4.34", features = ["serde"] }
@@ -25,3 +21,4 @@ utoipa.workspace = true
 utoipa-swagger-ui.workspace = true
 tracing.workspace = true
 tokio.workspace = true
+sqlx.workspace = true

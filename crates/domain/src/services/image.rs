@@ -12,8 +12,11 @@ impl ImageUseCase {
     max_file_size: usize, // Kích thước tối đa (bytes)
     max_width: u32,       // Chiều rộng tối đa để resize
     quality: u8,
+    sub_dir: &str,
   ) -> AppResult<String> {
-    repo.upload_and_resize(data, content_type, user_id, max_file_size, max_width, quality).await
+    repo
+      .upload_and_resize(data, content_type, user_id, max_file_size, max_width, quality, sub_dir)
+      .await
   }
 
   pub async fn remove_old_image(

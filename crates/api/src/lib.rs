@@ -1,12 +1,13 @@
 use std::sync::Arc;
 
-use axum::{Router, routing::get};
+use axum::{Router, extract::DefaultBodyLimit, routing::get};
 use core_app::AppState;
 
 pub mod auth;
 pub mod chat;
 pub mod macro_service;
 pub mod profile;
+pub mod service;
 pub mod user;
 
 pub use macro_service::*;
@@ -34,7 +35,9 @@ pub fn router_v1_private() -> Router<Arc<AppState>> {
       .merge(macro_service::user_macro::routes())
       .merge(chat::routes())
       .merge(auth::routes_auth())
-      .merge(profile::routes()),
+      .merge(profile::routes())
+      .merge(service::routes())
+      .layer(DefaultBodyLimit::max(5 * 1024 * 1024)), // 10MB
   )
 }
 

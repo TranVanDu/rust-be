@@ -1,7 +1,7 @@
 use serde::Serialize;
 use utoipa::ToSchema;
 
-#[derive(Serialize, ToSchema)]
+#[derive(Serialize, ToSchema, Debug)]
 pub struct PaginationMetadata {
   pub current_page: u64,
   pub per_page: u64,
@@ -29,10 +29,22 @@ pub struct TwilioSms {
 }
 
 #[derive(Default)]
-
 pub struct UpdateProfileImageParams {
   pub content_type: String,
   pub max_file_size: usize,
   pub max_width: u32,
   pub quality: u8,
+}
+
+pub struct UpdateServiceImageParams {
+  pub content_type: String,
+  pub max_file_size: usize,
+  pub max_width: u32,
+  pub quality: u8,
+}
+
+#[derive(ToSchema, Debug)]
+pub struct GetPaginationList<T> {
+  pub items: Vec<T>,
+  pub metadata: PaginationMetadata,
 }

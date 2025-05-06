@@ -5,11 +5,6 @@ edition = "2021"
 
 [dependencies]
 serde = { version = "1.0.217", features = ["derive"] }
-sqlx = { version = "0.8.3", features = [
-  "postgres",
-  "runtime-tokio-native-tls",
-] }
-
 tracing.workspace = true
 sea-query.workspace = true
 modql.workspace = true
@@ -20,6 +15,7 @@ axum = { workspace = true }
 tokio.workspace = true
 tower-http.workspace = true
 futures.workspace = true
+sqlx.workspace = true
 
 #Member
 core_app = { path = "../core_app" }
