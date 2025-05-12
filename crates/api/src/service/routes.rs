@@ -1,3 +1,4 @@
+use super::service_child;
 use super::services;
 use axum::{
   Router,
@@ -14,4 +15,10 @@ pub fn routes() -> Router<Arc<AppState>> {
     .route("/services/{id}", get(services::get_service))
     .route("/services/{id}", delete(services::delete_service))
     .route("/services/{id}", patch(services::update_service))
+    .route("/services/{id}/child/create", post(service_child::create_service))
+    .route("/services/{id}/child/list", get(service_child::get_services))
+    .route("/services/{id}/child/list-all", get(service_child::get_all_services))
+    .route("/services/{id}/child/{child_id}", get(service_child::get_service_child))
+    .route("/services/{id}/child/{child_id}", delete(service_child::delete_service))
+    .route("/services/{id}/child/{child_id}", patch(service_child::update_service))
 }

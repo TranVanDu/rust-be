@@ -1,37 +1,40 @@
 use async_trait::async_trait;
 use core_app::AppResult;
-use modql::filter::{ListOptions, OpValBool, OpValString, OpValsBool, OpValsInt32, OpValsString};
+use modql::filter::{
+  ListOptions, OpValBool, OpValString, OpValsBool, OpValsInt32, OpValsInt64, OpValsString,
+};
 use utils::pre_process::PreProcessR;
 
 use crate::entities::{
   common::PaginationMetadata,
-  service::{
-    CreateServiceRequest, Service, ServiceFilter, ServiceFilterConvert, ServiceWithChild,
-    UpdateServiceRequest,
+  service_child::{
+    CreateServiceChildRequest, ServiceChild, ServiceChildFilter, ServiceChildFilterConvert,
+    UpdateServiceChildRequest,
   },
   user::UserWithPassword,
 };
 
 #[async_trait]
-pub trait ServiceRepository: Send + Sync {
+pub trait ServiceChildRepository: Send + Sync {
   async fn create(
     &self,
     user: UserWithPassword,
-    data: CreateServiceRequest,
-  ) -> AppResult<Service>;
+    data: CreateServiceChildRequest,
+  ) -> AppResult<ServiceChild>;
 
   async fn update(
     &self,
     user: UserWithPassword,
     id: i64,
-    data: UpdateServiceRequest,
-  ) -> AppResult<Service>;
+    data: UpdateServiceChildRequest,
+  ) -> AppResult<ServiceChild>;
 
   async fn get_by_id(
     &self,
     user: UserWithPassword,
+    parent_id: i64,
     id: i64,
-  ) -> AppResult<ServiceWithChild>;
+  ) -> AppResult<ServiceChild>;
 
   async fn delete_by_id(
     &self,
@@ -42,24 +45,25 @@ pub trait ServiceRepository: Send + Sync {
   async fn get_services(
     &self,
     user: UserWithPassword,
-    filter: Option<ServiceFilterConvert>,
+    parent_id: i64,
+    filter: Option<ServiceChildFilterConvert>,
     list_options: Option<ListOptions>,
-  ) -> AppResult<(Vec<Service>, PaginationMetadata)>;
+  ) -> AppResult<(Vec<ServiceChild>, PaginationMetadata)>;
 
-  async fn get_all_services(&self) -> AppResult<Vec<Service>>;
+  async fn get_all_services(&self) -> AppResult<Vec<ServiceChild>>;
 }
 
 #[async_trait]
-impl PreProcessR for ServiceFilter {
-  type Output = ServiceFilterConvert;
+impl PreProcessR for ServiceChildFilter {
+  type Output = ServiceChildFilterConvert;
 
   async fn pre_process_r(self) -> AppResult<Self::Output> {
-    Ok(convert_service_filter(self))
+    Ok(convert_service_child_filter(self))
   }
 }
 
-fn convert_service_filter(filter: ServiceFilter) -> ServiceFilterConvert {
-  ServiceFilterConvert {
+fn convert_service_child_filter(filter: ServiceChildFilter) -> ServiceChildFilterConvert {
+  ServiceChildFilterConvert {
     service_name: filter
       .service_name
       .filter(|s| !s.trim().is_empty())
@@ -74,5 +78,6 @@ fn convert_service_filter(filter: ServiceFilter) -> ServiceFilterConvert {
       .map(|s| OpValsString(vec![OpValString::Ilike(format!("%{}%", s))])),
     price: filter.price.map(OpValsInt32::from),
     is_active: filter.is_active.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    parent_service_id: filter.parent_service_id.map(OpValsInt64::from),
   }
 }

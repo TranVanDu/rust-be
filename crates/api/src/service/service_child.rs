@@ -6,14 +6,16 @@ use core_app::{AppResult, AppState, errors::AppError};
 use domain::{
   entities::{
     common::GetPaginationList,
-    service::{
-      CreateServiceRequest, Service, ServiceFilter, ServiceWithChild, UpdateServiceRequest,
+    service_child::{
+      CreateServiceChildRequest, ServiceChild, ServiceChildFilter, UpdateServiceChildRequest,
     },
     user::UserWithPassword,
   },
-  services::service::ServiceUseCase,
+  services::service_child::ServiceChildUseCase,
 };
-use infra::repositories::{image::LocalImageService, service::SqlxServiceRepository};
+use infra::repositories::{
+  image::LocalImageService, service::service_child::SqlxServiceChildRepository,
+};
 use modql::filter::ListOptions;
 use serde_json::{Value, json};
 use std::{collections::HashMap, sync::Arc};
@@ -22,40 +24,42 @@ use utils::pre_process::PreProcessR;
 
 #[utoipa::path(
     get,
-    path = "/api/v1/services/{id}",
+    path = "/api/v1/services/{id}/child/{child_id}",
     params(
-          ("id" = i64, Path, description = "Entity identifier")
+          ("id" = i64, Path, description = "Entity identifier"),
+          ("child_id" = i64, Path, description = "Child entity identifier")
         ),
-    tag="Services",
+    tag="Services Child",
     responses(
-        (status = 200, description = "successfully", body = ServiceWithChild),
+        (status = 200, description = "successfully", body = ServiceChild),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
 )]
-pub async fn get_service(
+pub async fn get_service_child(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
-  Path(id): Path<i64>,
-) -> AppResult<Json<ServiceWithChild>> {
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let service = ServiceUseCase::get_by_id(&service_repo, user, id).await?;
-
-  Ok(Json(service))
+  Path((id, child_id)): Path<(i64, i64)>,
+) -> AppResult<Json<ServiceChild>> {
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
+  let service_child =
+    ServiceChildUseCase::get_by_id(&service_child_repo, user, id, child_id).await?;
+  Ok(Json(service_child))
 }
 
 #[utoipa::path(
     get,
-    path = "/api/v1/services/list",
+    path = "/api/v1/services/{id}/child/list",
     params(
+          ("id" = i64, Path, description = "Entity identifier"),
           ("limit" = Option<u64>, Query, description = "Number of items to return"),
           ("offset" = Option<u64>, Query, description = "Number of items to skip"),
           ("order_by" = Option<String>, Query, description = "Field to order by"),
-          ServiceFilter
+          ServiceChildFilter
         ),
-    tag="Services",
+    tag="Services Child",
     responses(
-        (status = 200, description = "successfully", body = GetPaginationList<Service>),
+        (status = 200, description = "successfully", body = GetPaginationList<ServiceChild>),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -64,14 +68,20 @@ pub async fn get_service(
 pub async fn get_services(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
-  Query(filter): Query<ServiceFilter>,
+  Query(filter): Query<ServiceChildFilter>,
   Query(list_options): Query<ListOptions>,
+  Path(id): Path<i64>,
 ) -> AppResult<Json<Value>> {
   let filter_convert = filter.clone().pre_process_r().await?;
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let (services, pagination) =
-    ServiceUseCase::get_services(&service_repo, user, Some(filter_convert), Some(list_options))
-      .await?;
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
+  let (services, pagination) = ServiceChildUseCase::get_services(
+    &service_child_repo,
+    user,
+    id,
+    Some(filter_convert),
+    Some(list_options),
+  )
+  .await?;
 
   let response = json!({
       "data": services,
@@ -82,29 +92,35 @@ pub async fn get_services(
 
 #[utoipa::path(
     get,
-    path = "/api/v1/services/list-all",
-    tag="Services",
+    path = "/api/v1/services/{id}/child/list-all",
+    params(
+          ("id" = i64, Path, description = "Entity identifier")
+        ),
+    tag="Services Child",
     responses(
-        (status = 200, description = "successfully", body = Vec<Service>),
+        (status = 200, description = "successfully", body = Vec<ServiceChild>),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
 )]
 
-pub async fn get_all_services(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Service>>> {
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let services = ServiceUseCase::get_all_services(&service_repo).await?;
+pub async fn get_all_services(
+  State(state): State<Arc<AppState>>
+) -> AppResult<Json<Vec<ServiceChild>>> {
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
+  let service_children = ServiceChildUseCase::get_all_services(&service_child_repo).await?;
 
-  Ok(Json(services))
+  Ok(Json(service_children))
 }
 
 #[utoipa::path(
     delete,
-    path = "/api/v1/services/{id}",
+    path = "/api/v1/services/{id}/child/{child_id}",
     params(
-          ("id" = i64, Path, description = "Entity identifier")
+          ("id" = i64, Path, description = "Entity identifier"),
+          ("child_id" = i64, Path, description = "Child entity identifier")
         ),
-    tag="Services",
+   tag="Services Child",
     responses(
         (status = 200, description = "successfully", body = bool),
         (status = 400, description = "Bad request", body = String),
@@ -114,21 +130,24 @@ pub async fn get_all_services(State(state): State<Arc<AppState>>) -> AppResult<J
 pub async fn delete_service(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
-  Path(id): Path<i64>,
+  Path((id, child_id)): Path<(i64, i64)>,
 ) -> AppResult<Json<bool>> {
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let bool = ServiceUseCase::delete_by_id(&service_repo, user, id).await?;
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
+  let bool = ServiceChildUseCase::delete_by_id(&service_child_repo, user, child_id).await?;
 
   Ok(Json(bool))
 }
 
 #[utoipa::path(
     post,
-    path = "/api/v1/services/create",
-    tag="Services",
+    path = "/api/v1/services/{id}/child/create",
+    params(
+          ("id" = i64, Path, description = "Entity identifier")
+        ),
+ tag="Services Child",
     request_body(
         content_type = "multipart/form-data",
-        content = CreateServiceRequest,
+        content = CreateServiceChildRequest,
         description = "Upload a service image (field name: 'image', supported formats: JPG, PNG)",
         example = json!({
             "service_name": "Example Service",
@@ -140,7 +159,7 @@ pub async fn delete_service(
         })
     ),
     responses(
-        (status = 200, description = "Create service successfully", body = Service),
+        (status = 200, description = "Create service successfully", body = ServiceChild),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -149,15 +168,16 @@ pub async fn create_service(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
   mut multipart: Multipart,
-) -> AppResult<Json<Service>> {
+) -> AppResult<Json<ServiceChild>> {
   let mut form_data = HashMap::new();
   info!("Starting service creation for user: {}", user.pk_user_id);
 
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
   let image_repo: Arc<_> = Arc::new(LocalImageService);
 
   // Initialize default payload with optional fields
-  let mut payload = CreateServiceRequest {
+  let mut payload = CreateServiceChildRequest {
+    parent_service_id: 0,
     service_name: String::new(),
     service_name_ko: None,
     service_name_en: None,
@@ -247,6 +267,9 @@ pub async fn create_service(
   if let Some(service_name) = form_data.get("service_name") {
     payload.service_name = service_name.to_string();
   }
+  if let Some(parent_service_id) = form_data.get("parent_service_id") {
+    payload.parent_service_id = parent_service_id.parse::<i64>().unwrap();
+  }
   if let Some(service_name_ko) = form_data.get("service_name_ko") {
     payload.service_name_ko = Some(service_name_ko.to_string());
   }
@@ -270,17 +293,27 @@ pub async fn create_service(
   if payload.service_name.trim().is_empty() {
     return Err(AppError::BadRequest("Service name is required".to_string()));
   }
+  if payload.parent_service_id == 0 {
+    return Err(AppError::BadRequest("Parent service id is required".to_string()));
+  }
 
   info!("Creating service with name: {}", payload.service_name);
 
   // Create service with or without image
   let service = if let (Some(image_data), Some(content_type)) = (image_data, content_type) {
-    ServiceUseCase::create(&service_repo, image_repo, user, &image_data, &content_type, payload)
-      .await?
+    ServiceChildUseCase::create(
+      &service_child_repo,
+      image_repo,
+      user,
+      &image_data,
+      &content_type,
+      payload,
+    )
+    .await?
   } else {
     // Create service without image
-    ServiceUseCase::create(
-      &service_repo,
+    ServiceChildUseCase::create(
+      &service_child_repo,
       image_repo,
       user,
       &[],
@@ -294,11 +327,15 @@ pub async fn create_service(
 
 #[utoipa::path(
     patch,
-    path = "/api/v1/services/{id}",
-    tag="Services",
+    path = "/api/v1/services/{id}/child/{child_id}",
+    params(
+          ("id" = i64, Path, description = "Entity identifier"),
+          ("child_id" = i64, Path, description = "Child entity identifier")
+        ),
+   tag="Services Child",
     request_body(
         content_type = "multipart/form-data",
-        content = UpdateServiceRequest,
+        content = UpdateServiceChildRequest,
         description = "Upload a service image (field name: 'image', supported formats: JPG, PNG)",
         example = json!({
             "service_name": "Example Service",
@@ -310,7 +347,7 @@ pub async fn create_service(
         })
     ),
     responses(
-        (status = 200, description = "Create service successfully", body = Service),
+        (status = 200, description = "Create service successfully", body = ServiceChild),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -318,17 +355,18 @@ pub async fn create_service(
 pub async fn update_service(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
-  Path(id): Path<i64>,
+  Path((id, child_id)): Path<(i64, i64)>,
   mut multipart: Multipart,
-) -> AppResult<Json<Service>> {
+) -> AppResult<Json<ServiceChild>> {
   let mut form_data = HashMap::new();
   info!("Starting service creation for user: {}", user.pk_user_id);
 
-  let service_repo = SqlxServiceRepository { db: state.db.clone() };
+  let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
   let image_repo: Arc<_> = Arc::new(LocalImageService);
 
   // Initialize default payload with optional fields
-  let mut payload = UpdateServiceRequest {
+  let mut payload = UpdateServiceChildRequest {
+    parent_service_id: None,
     service_name: None,
     service_name_ko: None,
     service_name_en: None,
@@ -418,6 +456,9 @@ pub async fn update_service(
   if let Some(service_name) = form_data.get("service_name") {
     payload.service_name = Some(service_name.to_string());
   }
+  if let Some(parent_service_id) = form_data.get("parent_service_id") {
+    payload.parent_service_id = Some(parent_service_id.parse::<i64>().unwrap());
+  }
   if let Some(service_name_ko) = form_data.get("service_name_ko") {
     payload.service_name_ko = Some(service_name_ko.to_string());
   }
@@ -439,15 +480,23 @@ pub async fn update_service(
 
   // update service with or without image
   let service = if let (Some(image_data), Some(content_type)) = (image_data, content_type) {
-    ServiceUseCase::update(&service_repo, image_repo, user, id, &image_data, &content_type, payload)
-      .await?
-  } else {
-    // update service without image
-    ServiceUseCase::update(
-      &service_repo,
+    ServiceChildUseCase::update(
+      &service_child_repo,
       image_repo,
       user,
-      id,
+      child_id,
+      &image_data,
+      &content_type,
+      payload,
+    )
+    .await?
+  } else {
+    // update service without image
+    ServiceChildUseCase::update(
+      &service_child_repo,
+      image_repo,
+      user,
+      child_id,
       &[],
       "image/jpeg", // Default content type
       payload,

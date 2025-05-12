@@ -1,16 +1,18 @@
-use super::image::LocalImageService;
 use crate::repositories::base::LIST_LIMIT_MAX;
+use crate::repositories::image::LocalImageService;
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
-use domain::entities::common::PaginationMetadata;
-use domain::entities::service::ServiceWithChild;
-use domain::entities::service_child::ServiceChild;
 use domain::{
   entities::{
-    service::{CreateServiceRequest, Service, ServiceFilterConvert, UpdateServiceRequest},
+    common::PaginationMetadata,
+    service_child::{
+      CreateServiceChildRequest, ServiceChild, ServiceChildFilterConvert, UpdateServiceChildRequest,
+    },
     user::UserWithPassword,
   },
-  repositories::{image_repository::ImageRepository, service_repository::ServiceRepository},
+  repositories::{
+    image_repository::ImageRepository, service_child_repository::ServiceChildRepository,
+  },
 };
 use modql::{
   SIden,
@@ -22,56 +24,31 @@ use sea_query_binder::SqlxBinder;
 use sqlx::PgPool;
 use std::sync::Arc;
 use tracing::info;
-pub mod service_child;
 
-pub struct SqlxServiceRepository {
+pub struct SqlxServiceChildRepository {
   pub db: PgPool,
 }
 
 #[async_trait]
-impl ServiceRepository for SqlxServiceRepository {
+impl ServiceChildRepository for SqlxServiceChildRepository {
   async fn get_by_id(
     &self,
     _: UserWithPassword,
+    parent_id: i64,
     id: i64,
-  ) -> AppResult<ServiceWithChild> {
-    let service = sqlx::query_as::<_, Service>(
+  ) -> AppResult<ServiceChild> {
+    let service = sqlx::query_as::<_, ServiceChild>(
       r#"
-    SELECT * FROM users.services WHERE id = $1
+    SELECT * FROM users.service_items WHERE id = $1 AND parent_service_id = $2
     "#,
     )
     .bind(id)
+    .bind(parent_id)
     .fetch_optional(&self.db)
     .await?
     .ok_or(AppError::NotFound)?;
 
-    let child_services = sqlx::query_as::<_, ServiceChild>(
-      r#"
-    SELECT * FROM users.service_items WHERE parent_service_id = $1
-    "#,
-    )
-    .bind(id)
-    .fetch_all(&self.db)
-    .await?;
-
-    let mut service_with_child = ServiceWithChild {
-      id: service.id,
-      service_name: service.service_name,
-      service_name_en: service.service_name_en,
-      service_name_ko: service.service_name_ko,
-      description_ko: service.description_ko,
-      description_en: service.description_en,
-      description: service.description,
-      price: service.price,
-      image: service.image,
-      is_active: service.is_active,
-      service_type: service.service_type,
-      created_at: service.created_at,
-      updated_at: service.updated_at,
-      child: child_services,
-    };
-
-    Ok(service_with_child)
+    Ok(service)
   }
 
   async fn delete_by_id(
@@ -79,9 +56,10 @@ impl ServiceRepository for SqlxServiceRepository {
     _: UserWithPassword,
     id: i64,
   ) -> AppResult<bool> {
-    let service = sqlx::query_as::<_, Service>(
+    info!("{}", id);
+    let service = sqlx::query_as::<_, ServiceChild>(
       r#"
-    SELECT * FROM users.services WHERE id = $1
+    SELECT * FROM users.service_items WHERE id = $1 
     "#,
     )
     .bind(id)
@@ -89,9 +67,11 @@ impl ServiceRepository for SqlxServiceRepository {
     .await?
     .ok_or(AppError::NotFound)?;
 
+    tracing::info!("{:?}", service);
+
     let count = sqlx::query(
       r#"
-    DELETE FROM users.services WHERE id = $1
+    DELETE FROM users.service_items WHERE id = $1   
     "#,
     )
     .bind(id)
@@ -117,21 +97,25 @@ impl ServiceRepository for SqlxServiceRepository {
   async fn create(
     &self,
     _: UserWithPassword,
-    data: CreateServiceRequest,
-  ) -> AppResult<Service> {
+    data: CreateServiceChildRequest,
+  ) -> AppResult<ServiceChild> {
     let fields = data.not_none_sea_fields();
     let (columns, sea_values) = fields.for_sea_insert();
 
     let mut query = Query::insert();
     query
-      .into_table(TableRef::SchemaTable(SIden("users").into_iden(), SIden("services").into_iden()))
+      .into_table(TableRef::SchemaTable(
+        SIden("users").into_iden(),
+        SIden("service_items").into_iden(),
+      ))
       .columns(columns)
       .values(sea_values)?;
     query.returning(Query::returning().column(Asterisk));
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let service = sqlx::query_as_with::<_, Service, _>(&sql, values).fetch_one(&self.db).await?;
+    let service =
+      sqlx::query_as_with::<_, ServiceChild, _>(&sql, values).fetch_one(&self.db).await?;
 
     Ok(service)
   }
@@ -140,11 +124,11 @@ impl ServiceRepository for SqlxServiceRepository {
     &self,
     _: UserWithPassword,
     id: i64,
-    data: UpdateServiceRequest,
-  ) -> AppResult<Service> {
-    let service_past = sqlx::query_as::<_, Service>(
+    data: UpdateServiceChildRequest,
+  ) -> AppResult<ServiceChild> {
+    let service_past = sqlx::query_as::<_, ServiceChild>(
       r#"
-      SELECT * FROM users.services WHERE id = $1
+      SELECT * FROM users.service_items WHERE id = $1    
       "#,
     )
     .bind(&id)
@@ -157,14 +141,15 @@ impl ServiceRepository for SqlxServiceRepository {
 
     let mut query = Query::update();
     query
-      .table(TableRef::SchemaTable(SIden("users").into_iden(), SIden("services").into_iden()))
+      .table(TableRef::SchemaTable(SIden("users").into_iden(), SIden("service_items").into_iden()))
       .values(sea_values)
       .and_where(Expr::col(SIden("id").into_iden()).eq(id))
       .returning(Query::returning().column(Asterisk));
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let service = sqlx::query_as_with::<_, Service, _>(&sql, values).fetch_one(&self.db).await?;
+    let service =
+      sqlx::query_as_with::<_, ServiceChild, _>(&sql, values).fetch_one(&self.db).await?;
 
     tokio::spawn(async move {
       if service_past.image.is_some() {
@@ -180,15 +165,17 @@ impl ServiceRepository for SqlxServiceRepository {
   async fn get_services(
     &self,
     _: UserWithPassword,
-    filter: Option<ServiceFilterConvert>,
+    parent_id: i64,
+    filter: Option<ServiceChildFilterConvert>,
     list_options: Option<ListOptions>,
-  ) -> AppResult<(Vec<Service>, PaginationMetadata)> {
+  ) -> AppResult<(Vec<ServiceChild>, PaginationMetadata)> {
     // TODO: Vec<Service>> {
     info!("filter_value: {:?}", filter);
     let mut query = Query::select();
     query
-      .from(TableRef::SchemaTable(SIden("users").into_iden(), SIden("services").into_iden()))
-      .columns([Asterisk]);
+      .from(TableRef::SchemaTable(SIden("users").into_iden(), SIden("service_items").into_iden()))
+      .columns([Asterisk])
+      .and_where(Expr::col(SIden("parent_service_id").into_iden()).eq(parent_id));
 
     if let Some(filter_value) = filter.clone() {
       let filters: FilterGroups = filter_value.into();
@@ -213,7 +200,7 @@ impl ServiceRepository for SqlxServiceRepository {
 
     list_options.apply_to_sea_query(&mut query);
 
-    let entities = sqlx::query_as_with::<_, Service, _>(&sql, values)
+    let entities = sqlx::query_as_with::<_, ServiceChild, _>(&sql, values)
       .fetch_all(&self.db)
       .await
       .map_err(|err| AppError::BadRequest(err.to_string()))?;
@@ -230,10 +217,10 @@ impl ServiceRepository for SqlxServiceRepository {
     Ok((entities, metadata))
   }
 
-  async fn get_all_services(&self) -> AppResult<Vec<Service>> {
-    let services = sqlx::query_as::<_, Service>(
+  async fn get_all_services(&self) -> AppResult<Vec<ServiceChild>> {
+    let services = sqlx::query_as::<_, ServiceChild>(
       r#"
-    SELECT * FROM users.services
+    SELECT * FROM users.service_items
     "#,
     )
     .fetch_all(&self.db)

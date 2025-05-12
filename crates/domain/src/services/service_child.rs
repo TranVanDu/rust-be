@@ -1,57 +1,63 @@
 use crate::{
   entities::{
     common::PaginationMetadata,
-    service::{
-      CreateServiceRequest, Service, ServiceFilterConvert, ServiceWithChild, UpdateServiceRequest,
+    service_child::{
+      CreateServiceChildRequest, ServiceChild, ServiceChildFilterConvert, UpdateServiceChildRequest,
     },
     user::UserWithPassword,
   },
-  repositories::{image_repository::ImageRepository, service_repository::ServiceRepository},
+  repositories::{
+    image_repository::ImageRepository, service_child_repository::ServiceChildRepository,
+  },
 };
 use core_app::{AppResult, errors::AppError};
 use modql::filter::ListOptions;
 use std::sync::Arc;
 
-pub struct ServiceUseCase;
+pub struct ServiceChildUseCase;
 
-impl ServiceUseCase {
+impl ServiceChildUseCase {
   pub async fn get_by_id(
-    service_repo: &dyn ServiceRepository,
+    service_child_repo: &dyn ServiceChildRepository,
     user: UserWithPassword,
+    parent_id: i64,
     id: i64,
-  ) -> AppResult<ServiceWithChild> {
-    service_repo.get_by_id(user, id).await
+  ) -> AppResult<ServiceChild> {
+    service_child_repo.get_by_id(user, parent_id, id).await
   }
 
   pub async fn delete_by_id(
-    service_repo: &dyn ServiceRepository,
+    service_child_repo: &dyn ServiceChildRepository,
     user: UserWithPassword,
     id: i64,
   ) -> AppResult<bool> {
-    service_repo.delete_by_id(user, id).await
+    service_child_repo.delete_by_id(user, id).await
   }
 
   pub async fn get_services(
-    service_repo: &dyn ServiceRepository,
+    service_child_repo: &dyn ServiceChildRepository,
     user: UserWithPassword,
-    filter: Option<ServiceFilterConvert>,
+    parent_id: i64,
+    filter: Option<ServiceChildFilterConvert>,
     list_options: Option<ListOptions>,
-  ) -> AppResult<(Vec<Service>, PaginationMetadata)> {
-    service_repo.get_services(user, filter, list_options).await
+  ) -> AppResult<(Vec<ServiceChild>, PaginationMetadata)> {
+    service_child_repo.get_services(user, parent_id, filter, list_options).await
   }
 
-  pub async fn get_all_services(service_repo: &dyn ServiceRepository) -> AppResult<Vec<Service>> {
-    service_repo.get_all_services().await
+  pub async fn get_all_services(
+    service_child_repo: &dyn ServiceChildRepository
+  ) -> AppResult<Vec<ServiceChild>> {
+    service_child_repo.get_all_services().await
   }
 
   pub async fn create(
-    service_repo: &dyn ServiceRepository,
+    service_child_repo: &dyn ServiceChildRepository,
     image_service: Arc<dyn ImageRepository>,
     user: UserWithPassword,
     data: &[u8],
     content_type: &str,
-    mut payload: CreateServiceRequest,
-  ) -> AppResult<Service> {
+    mut payload: CreateServiceChildRequest,
+  ) -> AppResult<ServiceChild> {
     if payload.service_name.trim().is_empty() {
       return Err(AppError::BadRequest("Service name cannot be empty".to_string()));
     }
@@ -79,18 +85,18 @@ impl ServiceUseCase {
 
       payload.image = Some(image_path.clone());
     }
-    service_repo.create(user, payload).await
+    service_child_repo.create(user, payload).await
   }
 
   pub async fn update(
-    service_repo: &dyn ServiceRepository,
+    service_child_repo: &dyn ServiceChildRepository,
     image_service: Arc<dyn ImageRepository>,
     user: UserWithPassword,
     id: i64,
     data: &[u8],
     content_type: &str,
-    mut payload: UpdateServiceRequest,
-  ) -> AppResult<Service> {
+    mut payload: UpdateServiceChildRequest,
+  ) -> AppResult<ServiceChild> {
     if let Some(service_name) = &payload.service_name {
       if service_name.len() > 100 {
         return Err(AppError::BadRequest("Service name cannot exceed 100 characters".to_string()));
@@ -116,6 +122,6 @@ impl ServiceUseCase {
 
       payload.image = Some(image_path.clone());
     }
-    service_repo.update(user, id, payload).await
+    service_child_repo.update(user, id, payload).await
   }
 }

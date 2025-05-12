@@ -1,18 +1,19 @@
 use chrono::{DateTime, Utc};
 use modql::{
   field::Fields,
-  filter::{FilterNodes, OpValsBool, OpValsInt32, OpValsString},
+  filter::{FilterNodes, OpValsBool, OpValsInt32, OpValsInt64, OpValsString},
 };
 use serde::{Deserialize, Serialize};
 use sqlx::FromRow;
 use utils::deserialize::{trim_option_string, trim_string};
 use utoipa::{IntoParams, ToSchema};
 
-use super::service_child::ServiceChild;
+use super::service::Service;
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
-pub struct Service {
+pub struct ServiceChild {
   pub id: i64,
+  pub parent_service_id: i64,
   pub service_name: String,
   pub service_name_en: Option<String>,
   pub service_name_ko: Option<String>,
@@ -28,9 +29,10 @@ pub struct Service {
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Fields)]
-pub struct CreateServiceRequest {
+pub struct CreateServiceChildRequest {
   #[serde(deserialize_with = "trim_string")]
   pub service_name: String,
+  pub parent_service_id: i64,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub description: Option<String>,
@@ -54,7 +56,7 @@ pub struct CreateServiceRequest {
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Fields)]
-pub struct UpdateServiceRequest {
+pub struct UpdateServiceChildRequest {
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub service_name: Option<String>,
@@ -66,6 +68,7 @@ pub struct UpdateServiceRequest {
   pub image: Option<String>,
   pub service_type: Option<String>,
   pub is_active: Option<bool>,
+  pub parent_service_id: Option<i64>,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub service_name_en: Option<String>,
@@ -80,26 +83,28 @@ pub struct UpdateServiceRequest {
   pub description_en: Option<String>,
 }
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone, IntoParams, ToSchema)]
-pub struct ServiceFilter {
+pub struct ServiceChildFilter {
   pub service_name: Option<String>,
   pub price: Option<i32>,
   pub is_active: Option<bool>,
   pub service_name_en: Option<String>,
   pub service_name_ko: Option<String>,
+  pub parent_service_id: Option<i64>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone)]
-pub struct ServiceFilterConvert {
+pub struct ServiceChildFilterConvert {
   pub service_name: Option<OpValsString>,
   pub price: Option<OpValsInt32>,
   pub is_active: Option<OpValsBool>,
   pub service_name_en: Option<OpValsString>,
   pub service_name_ko: Option<OpValsString>,
+  pub parent_service_id: Option<OpValsInt64>,
 }
 
-#[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
-pub struct ServiceWithChild {
+pub struct ServiceChildWithParent {
   pub id: i64,
+  pub parent: Service,
   pub service_name: String,
   pub service_name_en: Option<String>,
   pub service_name_ko: Option<String>,
@@ -112,5 +117,4 @@ pub struct ServiceWithChild {
   pub service_type: Option<String>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
-  pub child: Vec<ServiceChild>,
 }
