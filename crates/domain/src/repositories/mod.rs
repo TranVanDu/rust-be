@@ -1,3 +1,4 @@
+pub mod appointment_repository;
 pub mod auth_repository;
 pub mod chat_repository;
 pub mod image_repository;

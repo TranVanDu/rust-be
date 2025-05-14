@@ -47,7 +47,15 @@ use utoipa_swagger_ui::SwaggerUi;
     api::service::service_child::get_all_services,
     api::service::service_child::delete_service,
     api::service::service_child::update_service,
-  
+
+    //appointment
+    api::appointment::services::get_appointments,
+    api::appointment::services::create_appointment,
+    api::appointment::services::update_appointment,
+    api::appointment::services::get_appointment,
+    api::appointment::services::get_appointment_by_user_id,
+    api::appointment::services::delete_appointment,
+   
     //user
     api::macro_service::user_macro::create,
     api::macro_service::user_macro::list,
@@ -62,6 +70,7 @@ use utoipa_swagger_ui::SwaggerUi;
     (name = "Profile Service", description = "Profile service endpoints"),
     (name = "Services", description = "Service endpoints"),
     (name = "Services Child", description = "Service child endpoints"),
+    (name = "Appointment Service", description = "Appointment service endpoints"),
     (name = "User Service", description = "User service endpoints"),
     (name = "Chat Service", description = "Chat service endpoints"),
     

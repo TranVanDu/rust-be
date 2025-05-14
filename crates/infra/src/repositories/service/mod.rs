@@ -54,7 +54,7 @@ impl ServiceRepository for SqlxServiceRepository {
     .fetch_all(&self.db)
     .await?;
 
-    let mut service_with_child = ServiceWithChild {
+    let service_with_child = ServiceWithChild {
       id: service.id,
       service_name: service.service_name,
       service_name_en: service.service_name_en,

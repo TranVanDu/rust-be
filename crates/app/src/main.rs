@@ -1,4 +1,5 @@
 mod api_docs;
+mod cron;
 mod trace;
 use api::{app_router, router_v1_private, router_v1_public};
 use api_docs::api_docs_router;
@@ -34,6 +35,9 @@ async fn main() {
   dotenv().ok();
   // initialize tracing
   let _guard = tracing_init();
+
+  // Start the log cleanup job
+  tokio::spawn(cron::start_log_cleanup_job());
 
   let sensitive_headers: Arc<[_]> = vec![header::AUTHORIZATION, header::COOKIE].into();
 

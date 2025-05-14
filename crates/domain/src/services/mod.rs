@@ -1,3 +1,4 @@
+pub mod appointment;
 pub mod chat;
 pub mod image;
 pub mod profile;
