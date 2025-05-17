@@ -66,7 +66,7 @@ impl ProdConfig {
       .build()
       .map_err(AppError::Config)?;
 
-    if env == "prod" {
+    if env == "production" {
       let loaded = config
         .try_deserialize::<ProdEnv>()
         .unwrap_or_else(|_| ProdEnv { app: ProdConfig::default() });

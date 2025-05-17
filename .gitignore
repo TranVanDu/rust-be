@@ -4,4 +4,5 @@
 /crates/logs/
 /crates/app/target/
 /.vscode
-
+.DS_Store
+.env

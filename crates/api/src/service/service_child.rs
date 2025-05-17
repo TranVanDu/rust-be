@@ -5,7 +5,7 @@ use axum::{
 use core_app::{AppResult, AppState, errors::AppError};
 use domain::{
   entities::{
-    common::GetPaginationList,
+    common::{GetPaginationList, PaginationOptions},
     service_child::{
       CreateServiceChildRequest, ServiceChild, ServiceChildFilter, UpdateServiceChildRequest,
     },
@@ -16,7 +16,7 @@ use domain::{
 use infra::repositories::{
   image::LocalImageService, service::service_child::SqlxServiceChildRepository,
 };
-use modql::filter::ListOptions;
+use modql::filter::{ListOptions, OrderBys};
 use serde_json::{Value, json};
 use std::{collections::HashMap, sync::Arc};
 use tracing::{error, info};
@@ -52,8 +52,8 @@ pub async fn get_service_child(
     path = "/api/v1/services/{id}/child/list",
     params(
           ("id" = i64, Path, description = "Entity identifier"),
-          ("limit" = Option<u64>, Query, description = "Number of items to return"),
-          ("offset" = Option<u64>, Query, description = "Number of items to skip"),
+          ("page" = Option<u64>, Query, description = "Page number"),
+          ("per_page" = Option<u64>, Query, description = "Number of items to return"),
           ("order_by" = Option<String>, Query, description = "Field to order by"),
           ServiceChildFilter
         ),
@@ -69,9 +69,16 @@ pub async fn get_services(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
   Query(filter): Query<ServiceChildFilter>,
-  Query(list_options): Query<ListOptions>,
+  Query(list_options): Query<PaginationOptions>,
   Path(id): Path<i64>,
 ) -> AppResult<Json<Value>> {
+  let list_options = ListOptions {
+    limit: list_options.per_page.map(|limit| limit as i64),
+    offset: list_options.page.map(|page| {
+      if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+    }),
+    order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+  };
   let filter_convert = filter.clone().pre_process_r().await?;
   let service_child_repo = SqlxServiceChildRepository { db: state.db.clone() };
   let (services, pagination) = ServiceChildUseCase::get_services(

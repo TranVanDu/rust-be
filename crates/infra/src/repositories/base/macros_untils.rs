@@ -13,8 +13,8 @@ macro_rules! gen_com_fn {
       routing::{delete, get, patch, post, put},
       Json, Router,
     };
-    use domain::entities::common::PaginationMetadata;
-    use modql::filter::ListOptions;
+    use domain::entities::common::{PaginationMetadata, PaginationOptions};
+    use modql::filter::{ListOptions, OrderBys};
     use serde_json::{json, Value};
     use sqlx::PgPool;
     use std::sync::Arc;
@@ -134,8 +134,8 @@ macro_rules! gen_com_fn {
           ("BearerAuth" = [])
         ),
         params(
-          ("limit" = Option<u64>, Query, description = "Number of items to return"),
-          ("offset" = Option<u64>, Query, description = "Number of items to skip"),
+          ("page" = Option<u64>, Query, description = "Page number"),
+          ("per_page" = Option<u64>, Query, description = "Number of items to return"),
           ("order_by" = Option<String>, Query, description = "Field to order by"),
            $req_get_filter
         ),
@@ -147,9 +147,16 @@ macro_rules! gen_com_fn {
       )]
       pub async fn list(
         Query(query): Query<$req_get_filter>,
-        Query(list_options): Query<ListOptions>,
+        Query(list_options): Query<PaginationOptions>,
         State(state): State<Arc<AppState>>,
       ) -> AppResult<Json<Value>> {
+        let list_options = ListOptions {
+          limit: list_options.per_page.map(|limit| limit as i64),
+          offset: list_options.page.map(|page| {
+            if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+          }),
+          order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+        };
         let (data, pagination) = repo_list::<$struct_name, _, $entity_name>(&state.db, Some(query), Some(list_options)).await?;
         Ok(Json(json!({
           "data": data,

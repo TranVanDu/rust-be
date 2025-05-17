@@ -4,14 +4,17 @@ use axum::{
   extract::{Path, Query, State},
 };
 use core_app::{AppResult, AppState};
-use domain::entities::user::{
-  RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+use domain::entities::{
+  common::PaginationOptions,
+  user::{
+    RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+  },
 };
 pub use infra::database::schema::UserDmc;
 use infra::repositories::base::{
   count, create, create_many, delete, get_by_id, get_by_sth, list, update,
 };
-use modql::filter::ListOptions;
+use modql::filter::{ListOptions, OrderBys};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -35,9 +38,16 @@ impl UserService {
 
   pub async fn get_list_users(
     Query(query): Query<UserFilter>,
-    Query(list_options): Query<ListOptions>,
+    Query(list_options): Query<PaginationOptions>,
     State(state): State<Arc<AppState>>,
   ) -> AppResult<Json<Value>> {
+    let list_options = ListOptions {
+      limit: list_options.per_page.map(|limit| limit as i64),
+      offset: list_options.page.map(|page| {
+        if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+      }),
+      order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+    };
     let (users, pagination) =
       list::<UserDmc, _, User>(&state.db, Some(query), Some(list_options)).await?;
 

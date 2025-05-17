@@ -1,4 +1,4 @@
-use serde::Serialize;
+use serde::{Deserialize, Serialize};
 use utoipa::ToSchema;
 
 #[derive(Serialize, ToSchema, Debug)]
@@ -47,4 +47,11 @@ pub struct UpdateServiceImageParams {
 pub struct GetPaginationList<T> {
   pub items: Vec<T>,
   pub metadata: PaginationMetadata,
+}
+
+#[derive(Default, Debug, Clone, Serialize, Deserialize, ToSchema)]
+pub struct PaginationOptions {
+  pub page: Option<u64>,
+  pub per_page: Option<u64>,
+  pub order_by: Option<String>,
 }

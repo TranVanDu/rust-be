@@ -294,6 +294,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
         COALESCE(json_agg(json_build_object(
           'id', s.id,
           'service_name', s.service_name,
+          'service_name_en', s.service_name_en,
           'price', s.price
         )) FILTER (WHERE s.id IS NOT NULL), '[]'::json) AS services,
         json_build_object(

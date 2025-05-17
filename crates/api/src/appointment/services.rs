@@ -9,13 +9,13 @@ use domain::{
       Appointment, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
       UpdateAppointmentRequest,
     },
-    common::GetPaginationList,
+    common::{GetPaginationList, PaginationOptions},
     user::UserWithPassword,
   },
   services::appointment::AppointmentUseCase,
 };
 use infra::repositories::appointment::SqlxAppointmentRepository;
-use modql::filter::ListOptions;
+use modql::filter::{ListOptions, OrderBys};
 use serde_json::{Value, json};
 use std::sync::Arc;
 
@@ -134,13 +134,13 @@ pub async fn delete_appointment(
 }
 
 #[utoipa::path(
-    get,
+    get,  
     path = "/api/v1/appointment",
     tag="Appointment Service",
      params(
           ("id" = i64, Path, description = "Entity identifier"),
-          ("limit" = Option<u64>, Query, description = "Number of items to return"),
-          ("offset" = Option<u64>, Query, description = "Number of items to skip"),
+          ("page" = Option<u64>, Query, description = "Page number"),
+          ("per_page" = Option<u64>, Query, description = "Number of items to return"),
           ("order_by" = Option<String>, Query, description = "Field to order by"),
           AppointmentFilter
         ),
@@ -154,9 +154,17 @@ pub async fn get_appointments(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
   Query(filter): Query<AppointmentFilter>,
-  Query(list_options): Query<ListOptions>,
+  Query(list_options): Query<PaginationOptions>,
 ) -> AppResult<Json<Value>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+
+  let list_options = ListOptions {
+    limit: list_options.per_page.map(|limit| limit as i64),
+    offset: list_options.page.map(|page| {
+      if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+    }),
+    order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+  };
 
   let (appointments, pagination) =
     AppointmentUseCase::get_appointments(&appointment_repo, user, Some(filter), Some(list_options))
