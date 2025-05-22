@@ -260,6 +260,7 @@ pub async fn set_password(
   req: SetPasswordRequest,
 ) -> AppResult<SigninResponse> {
   let claims = decode_token::<ClaimsSetPassword>(&req.token, &state.config.jwt_secret_key)?;
+  let full_name = req.full_name.unwrap_or("".to_string());
 
   if claims.exp < Utc::now().timestamp() as usize {
     return Err(AppError::BadRequest("Token expired".to_string()));
@@ -284,7 +285,8 @@ pub async fn set_password(
   let mut tx = state.db.begin().await?;
 
   let user_updated =
-    update_user_password(&mut *tx, user.pk_user_id, &password_hash, user.is_verify).await;
+    update_user_password(&mut *tx, user.pk_user_id, &password_hash, user.is_verify, full_name)
+      .await;
 
   if let Err(e) = user_updated {
     tx.rollback().await?;

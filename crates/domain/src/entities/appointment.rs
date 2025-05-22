@@ -5,8 +5,6 @@ use sqlx::FromRow;
 use std::fmt;
 use utoipa::{IntoParams, ToSchema};
 
-use super::service_child::ServiceChild;
-
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
 pub struct Appointment {
   pub id: i64,

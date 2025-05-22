@@ -1,7 +1,9 @@
-use crate::entities::user::{RequestCreateUser, RequestUpdateUser, UserFilter, UserFilterConvert};
+use crate::entities::user::{
+  RequestCreateUser, RequestUpdateUser, User, UserFilter, UserFilterConvert, UserWithPassword,
+};
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
-use modql::filter::{OpValBool, OpValsBool, OpValsInt64, OpValsString};
+use modql::filter::{OpValBool, OpValString, OpValsBool, OpValsInt64, OpValsString};
 use regex::Regex;
 use utils::{
   password::hash_password,
@@ -97,9 +99,22 @@ fn convert_user_filter(filter: UserFilter) -> UserFilterConvert {
     pk_user_id: filter.pk_user_id.map(OpValsInt64::from),
     user_name: filter.user_name.map(OpValsString::from),
     email_address: filter.email_address.map(OpValsString::from),
-    phone: filter.phone.map(OpValsString::from),
-    full_name: filter.full_name.map(OpValsString::from),
+    phone: filter.phone.filter(|s| !s.trim().is_empty())
+      .map(|s| OpValsString(vec![OpValString::Ilike(format!("%{}%", s))])),
+    full_name: filter
+      .full_name
+      .filter(|s| !s.trim().is_empty())
+      .map(|s| OpValsString(vec![OpValString::Ilike(format!("%{}%", s))])),
     is_active: filter.is_active.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
-    is_verify: filter.is_active.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    is_verify: filter.is_verify.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    role: filter.role.map(|r| OpValsString(vec![OpValString::from(r.to_string())])),
   }
+}
+
+#[async_trait]
+pub trait UserRepository: Send + Sync {
+  async fn get_all_technician(
+    &self,
+    user: UserWithPassword,
+  ) -> AppResult<Vec<User>>;
 }

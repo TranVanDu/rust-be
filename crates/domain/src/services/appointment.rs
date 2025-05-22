@@ -44,7 +44,7 @@ impl AppointmentUseCase {
     appointment_repo: &dyn AppointmentRepository,
     user: UserWithPassword,
     mut appointment: CreateAppointmentRequest,
-  ) -> AppResult<Appointment> {
+  ) -> AppResult<AppointmentWithServices> {
     if appointment.services.is_empty() {
       return Err(AppError::BadRequest("Services are required".to_string()));
     }
@@ -67,7 +67,7 @@ impl AppointmentUseCase {
     id: i64,
     user: UserWithPassword,
     mut appointment: UpdateAppointmentRequest,
-  ) -> AppResult<Appointment> {
+  ) -> AppResult<AppointmentWithServices> {
     if appointment.services.is_some() {
       if appointment.services.as_ref().unwrap().is_empty() {
         return Err(AppError::BadRequest("Services are required".to_string()));
@@ -124,5 +124,21 @@ impl AppointmentUseCase {
     id: i64,
   ) -> AppResult<bool> {
     appointment_repo.delete_appointment(user, id).await
+  }
+
+  pub async fn get_appointment_by_user_id(
+    appointment_repo: &dyn AppointmentRepository,
+    user: UserWithPassword,
+  ) -> AppResult<Vec<Appointment>> {
+    appointment_repo.get_appointment_by_user_id(user).await
+  }
+
+  pub async fn get_appointment_by_technician(
+    appointment_repo: &dyn AppointmentRepository,
+    user: UserWithPassword,
+    filter: Option<AppointmentFilter>,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<AppointmentWithServices>, PaginationMetadata)> {
+    appointment_repo.get_appointment_by_technician(user, filter, list_options).await
   }
 }

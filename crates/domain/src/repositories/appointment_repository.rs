@@ -17,14 +17,14 @@ pub trait AppointmentRepository: Send + Sync {
     &self,
     user: UserWithPassword,
     appointment: CreateAppointmentRequest,
-  ) -> AppResult<Appointment>;
+  ) -> AppResult<AppointmentWithServices>;
 
   async fn update_appointment(
     &self,
     user: UserWithPassword,
     id: i64,
     payload: UpdateAppointmentRequest,
-  ) -> AppResult<Appointment>;
+  ) -> AppResult<AppointmentWithServices>;
 
   async fn get_appointments(
     &self,
@@ -50,4 +50,16 @@ pub trait AppointmentRepository: Send + Sync {
     user: UserWithPassword,
     id: i64,
   ) -> AppResult<bool>;
+
+  async fn get_appointment_by_user_id(
+    &self,
+    user: UserWithPassword,
+  ) -> AppResult<Vec<Appointment>>;
+
+  async fn get_appointment_by_technician(
+    &self,
+    user: UserWithPassword,
+    filter: Option<AppointmentFilter>,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<AppointmentWithServices>, PaginationMetadata)>;
 }

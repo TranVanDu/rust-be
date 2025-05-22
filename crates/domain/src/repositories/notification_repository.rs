@@ -1,28 +1,34 @@
-use crate::entities::notification::{
-  CreateNotification, Notification, NotificationFilter, UpdateNotification,
+use async_trait::async_trait;
+use core_app::AppResult;
+use modql::filter::ListOptions;
+
+use crate::entities::{
+  common::PaginationMetadata,
+  notification::{CreateNotification, Notification, NotificationFilter, UpdateNotification},
 };
 
-#[async_trait::async_trait]
-pub trait NotificationRepository {
+#[async_trait]
+pub trait NotificationRepository: Send + Sync {
   async fn create(
     &self,
     notification: CreateNotification,
-  ) -> Result<Notification, anyhow::Error>;
+  ) -> AppResult<Notification>;
   async fn update(
     &self,
     id: i64,
     update: UpdateNotification,
-  ) -> Result<Notification, anyhow::Error>;
+  ) -> AppResult<Notification>;
   async fn get_by_id(
     &self,
     id: i64,
-  ) -> Result<Option<Notification>, anyhow::Error>;
+  ) -> AppResult<Notification>;
   async fn list(
     &self,
     filter: NotificationFilter,
-  ) -> Result<Vec<Notification>, anyhow::Error>;
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<Notification>, PaginationMetadata)>;
   async fn delete(
     &self,
     id: i64,
-  ) -> Result<(), anyhow::Error>;
+  ) -> AppResult<bool>;
 }

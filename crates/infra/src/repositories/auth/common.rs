@@ -215,8 +215,10 @@ pub async fn update_user_password<'e>(
   user_id: i64,
   password_hash: &str,
   verify: bool,
+  full_name: String,
 ) -> AppResult<User> {
   let query = if verify {
+    // Nếu verify = true, chỉ update password_hash
     r#"
       UPDATE users.tbl_users 
       SET password_hash = $1
@@ -224,17 +226,32 @@ pub async fn update_user_password<'e>(
       RETURNING *
     "#
   } else {
-    r#"
-      UPDATE users.tbl_users 
-      SET password_hash = $1, is_verify = TRUE
-      WHERE pk_user_id = $2
-      RETURNING *
-    "#
+    // Nếu verify = false và có full_name, update cả password_hash và full_name
+    if !full_name.trim().is_empty() {
+      r#"
+        UPDATE users.tbl_users 
+        SET password_hash = $1, is_verify = TRUE, full_name = $3
+        WHERE pk_user_id = $2
+        RETURNING *
+      "#
+    } else {
+      r#"
+        UPDATE users.tbl_users 
+        SET password_hash = $1, is_verify = TRUE
+        WHERE pk_user_id = $2
+        RETURNING *
+      "#
+    }
   };
 
-  let user = sqlx::query_as::<_, User>(query)
-    .bind(password_hash)
-    .bind(user_id)
+  let mut query_builder = sqlx::query_as::<_, User>(query).bind(password_hash).bind(user_id);
+
+  // Chỉ bind full_name nếu verify = false và full_name có giá trị
+  if !verify && !full_name.trim().is_empty() {
+    query_builder = query_builder.bind(full_name);
+  }
+
+  let user = query_builder
     .fetch_optional(executor)
     .await?
     .ok_or_else(|| AppError::BadRequest("Can not update password".to_string()))?;

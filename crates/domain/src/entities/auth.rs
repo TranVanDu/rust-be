@@ -107,6 +107,7 @@ pub struct SetPasswordRequest {
   pub password: String,
   pub user_id: i64,
   pub token: String,
+  pub full_name: Option<String>,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]

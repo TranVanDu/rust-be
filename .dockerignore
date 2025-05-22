@@ -1,7 +1,34 @@
-git
+# Git
+.git
 .gitignore
-target
+
+# Rust
+target/
+**/*.rs.bk
+Cargo.lock
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Logs
+*.log
+
+# Environment
 .env
+.env.*
+
+# Test files
+tests/
+**/*_test.rs
+
+# Documentation
+docs/
+*.md
+
+# Temporary files
+*.tmp
+*.temp
 .DS_Store
-README.md
-logs

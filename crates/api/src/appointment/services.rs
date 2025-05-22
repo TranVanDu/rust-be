@@ -9,7 +9,7 @@ use domain::{
       Appointment, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
       UpdateAppointmentRequest,
     },
-    common::{GetPaginationList, PaginationOptions},
+    common::{GetPaginationList, PaginationMetadata, PaginationOptions},
     user::UserWithPassword,
   },
   services::appointment::AppointmentUseCase,
@@ -25,7 +25,7 @@ use std::sync::Arc;
     tag="Appointment Service",
     request_body = CreateAppointmentRequest,
     responses(
-        (status = 200, description = "Login successfully", body = Appointment),
+        (status = 200, description = "Login successfully", body = AppointmentWithServices),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -34,7 +34,7 @@ pub async fn create_appointment(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
   Json(req): Json<CreateAppointmentRequest>,
-) -> AppResult<Json<Appointment>> {
+) -> AppResult<Json<AppointmentWithServices>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
 
   let appointment = AppointmentUseCase::create_appointment(&appointment_repo, user, req).await?;
@@ -48,7 +48,7 @@ pub async fn create_appointment(
     tag="Appointment Service",
     request_body = UpdateAppointmentRequest,
     responses(
-        (status = 200, description = "Login successfully", body = Appointment),
+        (status = 200, description = "Login successfully", body = AppointmentWithServices),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -58,7 +58,7 @@ pub async fn update_appointment(
   Extension(user): Extension<UserWithPassword>,
   Path(id): Path<i64>,
   Json(req): Json<UpdateAppointmentRequest>,
-) -> AppResult<Json<Appointment>> {
+) -> AppResult<Json<AppointmentWithServices>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
 
   let appointment =
@@ -176,3 +176,69 @@ pub async fn get_appointments(
   });
   Ok(Json(response))
 }
+
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/appointment/get-current",
+    tag="Appointment Service",
+    responses(
+        (status = 200, description = "Login successfully", body = Vec<Appointment>),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_appointment_current_user(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+) -> AppResult<Json<Vec<Appointment>>> {
+  let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+
+  let appointment = AppointmentUseCase::get_appointment_by_user_id(&appointment_repo, user).await?;
+
+  Ok(Json(appointment))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/appointment-by-technician",
+    tag="Appointment Service",
+    params(
+          ("id" = i64, Path, description = "Entity identifier"),
+          ("page" = Option<u64>, Query, description = "Page number"),
+          ("per_page" = Option<u64>, Query, description = "Number of items to return"),
+          ("order_by" = Option<String>, Query, description = "Field to order by"),
+          AppointmentFilter
+        ),
+    responses(
+        (status = 200, description = "Login successfully", body = GetPaginationList<AppointmentWithServices>),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_appointment_by_technician(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+  Query(filter): Query<AppointmentFilter>,
+  Query(list_options): Query<PaginationOptions>,
+) -> AppResult<Json<Value>> {
+  let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+
+  let list_options = ListOptions {
+    limit: list_options.per_page.map(|limit| limit as i64),
+    offset: list_options.page.map(|page| {
+      if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+    }),
+    order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+  };
+  let (appointments, pagination) = AppointmentUseCase::get_appointment_by_technician(&appointment_repo, user, Some(filter), Some(list_options)).await?;
+
+  let response = json!({
+      "data": appointments,
+      "metadata": pagination
+  });
+  Ok(Json(response))
+}
+
+
+  

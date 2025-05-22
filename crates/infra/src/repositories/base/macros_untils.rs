@@ -157,7 +157,11 @@ macro_rules! gen_com_fn {
           }),
           order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
         };
-        let (data, pagination) = repo_list::<$struct_name, _, $entity_name>(&state.db, Some(query), Some(list_options)).await?;
+
+        // Preprocess filter
+        let filter = query.pre_process_r().await?;
+
+        let (data, pagination) = repo_list::<$struct_name, _, $entity_name>(&state.db, Some(filter), Some(list_options)).await?;
         Ok(Json(json!({
           "data": data,
           "metadata": pagination

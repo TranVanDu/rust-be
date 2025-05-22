@@ -27,5 +27,5 @@ axum.workspace = true
 image.workspace = true
 turbojpeg.workspace = true
 sqlx.workspace = true
-fcm = { workspace = true }
+gcp_auth.workspace = true
 anyhow.workspace = true

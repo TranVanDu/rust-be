@@ -7,10 +7,11 @@ pub mod appointment;
 pub mod auth;
 pub mod chat;
 pub mod macro_service;
+pub mod notification;
+pub mod notification_token;
 pub mod profile;
 pub mod service;
 pub mod user;
-
 pub use macro_service::*;
 
 pub fn router_v1() -> Router<Arc<AppState>> {
@@ -39,6 +40,9 @@ pub fn router_v1_private() -> Router<Arc<AppState>> {
       .merge(profile::routes())
       .merge(service::routes())
       .merge(appointment::routes())
+      .merge(user::routes_other())
+      .merge(notification_token::routes())
+      .merge(notification::routes())
       .layer(DefaultBodyLimit::max(5 * 1024 * 1024)), // 10MB
   )
 }

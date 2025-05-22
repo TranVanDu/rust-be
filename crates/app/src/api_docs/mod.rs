@@ -55,6 +55,8 @@ use utoipa_swagger_ui::SwaggerUi;
     api::appointment::services::get_appointment,
     api::appointment::services::get_appointment_by_user_id,
     api::appointment::services::delete_appointment,
+    api::appointment::services::get_appointment_current_user,
+    api::appointment::services::get_appointment_by_technician,
    
     //user
     api::macro_service::user_macro::create,
@@ -62,8 +64,24 @@ use utoipa_swagger_ui::SwaggerUi;
     api::macro_service::user_macro::get_by_id,
     api::macro_service::user_macro::update,
     api::macro_service::user_macro::get_by_sth,
-    api::macro_service::user_macro::delete_item
-    
+    api::macro_service::user_macro::delete_item,
+    api::user::services::get_all_technician,
+
+    //notification_token
+    api::notification_token::services::create,
+    api::notification_token::services::delete,
+    api::notification_token::services::update,
+    api::notification_token::services::get_token_by_id,
+    api::notification_token::services::get_token_by_user_id,
+    api::notification_token::services::get_list_tokens,
+
+    // notification
+    api::notification::services::create,
+    api::notification::services::delete,
+    api::notification::services::update,
+    api::notification::services::get_by_id,
+    api::notification::services::get_list,
+
   ),
   tags(
     (name = "Auth Service", description = "Auth service endpoints"),
@@ -72,6 +90,8 @@ use utoipa_swagger_ui::SwaggerUi;
     (name = "Services Child", description = "Service child endpoints"),
     (name = "Appointment Service", description = "Appointment service endpoints"),
     (name = "User Service", description = "User service endpoints"),
+    (name = "Notification Service", description = "Notification Service endpoints"),
+    (name = "Notification token Service", description = "Notification token Service endpoints"),
     (name = "Chat Service", description = "Chat service endpoints"),
     
   ),

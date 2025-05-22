@@ -33,11 +33,13 @@ use tracing::info;
 #[tokio::main]
 async fn main() {
   dotenv().ok();
-  // initialize tracing
-  let _guard = tracing_init();
+  // // initialize tracing
+  // let _guard = tracing_init();
 
-  // Start the log cleanup job
-  tokio::spawn(cron::start_log_cleanup_job());
+  // // Start the log cleanup job
+  // tokio::spawn(cron::start_log_cleanup_job());
+
+  tracing_init();
 
   let sensitive_headers: Arc<[_]> = vec![header::AUTHORIZATION, header::COOKIE].into();
 

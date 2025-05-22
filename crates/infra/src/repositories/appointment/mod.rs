@@ -1,4 +1,7 @@
+use crate::repositories::appointment::common::create_notification;
+use crate::repositories::notification::SqlxNotificationRepository;
 use async_trait::async_trait;
+use common::send_noti_update;
 use core_app::{AppResult, errors::AppError};
 use domain::{
   entities::{
@@ -12,7 +15,11 @@ use domain::{
   repositories::appointment_repository::AppointmentRepository,
 };
 use modql::filter::ListOptions;
+use serde_json;
 use sqlx::PgPool;
+use std::sync::Arc;
+
+use super::notification_token::SqlxNotiTokenRepository;
 
 pub mod common;
 
@@ -26,7 +33,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     &self,
     user: UserWithPassword,
     payload: CreateAppointmentRequest,
-  ) -> AppResult<Appointment> {
+  ) -> AppResult<AppointmentWithServices> {
     let updated_by = user.pk_user_id;
     let db = self.db.clone();
     let services = payload.services.clone();
@@ -36,6 +43,15 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       if !is_exit {
         return Err(AppError::BadRequest("Service not found".to_string()));
       }
+    }
+
+    let count_pending =
+      common::count_appointment_by_user_id_and_status(&db, payload.user_id, "PENDING".to_string())
+        .await?;
+    if count_pending > 1 {
+      return Err(AppError::BadRequest(
+        "Bạn không thể đăng kí quá 1 lịch hẹn cùng lúc! Hãy chờ NaSpa xác nhận".to_string(),
+      ));
     }
 
     let mut tx = db.begin().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
@@ -72,7 +88,38 @@ impl AppointmentRepository for SqlxAppointmentRepository {
 
     tx.commit().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
 
-    Ok(res)
+    let appointment: AppointmentWithServices = self.get_appointment_by_id(user, res.id).await?;
+    let user_full_name =
+      appointment.user.get("full_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
+
+    // Create notification in background
+    let db = self.db.clone();
+    let notification_repo = Arc::new(SqlxNotificationRepository { db: db.clone() });
+    let notification_token_repo = Arc::new(SqlxNotiTokenRepository { db: db.clone() });
+    tokio::spawn(async move {
+      match create_notification(
+        &db,
+        notification_repo,
+        notification_token_repo,
+        payload.user_id,
+        "Lịch hẹn mới".to_string(),
+        format!("{} vừa đặt lịch hẹn thành công! Vui lòng vào kiểm tra. ", user_full_name),
+        "ALL_RECEPTIONIST".to_string(),
+        Some(res.id),
+        Some(serde_json::json!({
+          "appointment_id": res.id,
+          "user_name": user_full_name,
+          "start_time": res.start_time,
+        })),
+      )
+      .await
+      {
+        Ok(_) => tracing::info!("Notification sent successfully"),
+        Err(e) => tracing::error!("Failed to send notification: {:?}", e),
+      }
+    });
+
+    Ok(appointment)
   }
 
   async fn update_appointment(
@@ -80,7 +127,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     user: UserWithPassword,
     id: i64,
     payload: UpdateAppointmentRequest,
-  ) -> AppResult<Appointment> {
+  ) -> AppResult<AppointmentWithServices> {
     let updated_by = user.pk_user_id;
     let db = self.db.clone();
     let services = payload.services.clone().unwrap_or_default();
@@ -112,7 +159,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       "#,
     )
     .bind(updated_by)
-    .bind(payload.status)
+    .bind(payload.status.clone())
     .bind(payload.notes)
     .bind(payload.start_time)
     .bind(payload.end_time)
@@ -158,6 +205,17 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     }
 
     tx.commit().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    let res = self.get_appointment(user.clone(), id).await?;
+    let db = self.db.clone();
+    let notification_repo = Arc::new(SqlxNotificationRepository { db: db.clone() });
+    let notification_token_repo = Arc::new(SqlxNotiTokenRepository { db: db.clone() });
+    let res_clone = res.clone();
+
+    tokio::spawn(async move {
+      let _ =
+        send_noti_update(&db, notification_repo, notification_token_repo, user, res_clone).await;
+    });
 
     Ok(res)
   }
@@ -287,103 +345,74 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     filter: Option<AppointmentFilter>,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<AppointmentWithServices>, PaginationMetadata)> {
-    let mut query = sqlx::query_as::<_, AppointmentWithServices>(
-      r#"
-      SELECT 
-        a.*,
-        COALESCE(json_agg(json_build_object(
-          'id', s.id,
-          'service_name', s.service_name,
-          'service_name_en', s.service_name_en,
-          'price', s.price
-        )) FILTER (WHERE s.id IS NOT NULL), '[]'::json) AS services,
-        json_build_object(
-          'id', u.pk_user_id,
-          'full_name', u.full_name,
-          'phone', u.phone
-        ) AS user,
-        CASE 
-          WHEN a.receptionist_id IS NULL THEN NULL
-          ELSE json_build_object(
-            'id', u2.pk_user_id,
-            'full_name', u2.full_name,
-            'phone', u2.phone
-          )
-        END AS receptionist,
-        CASE 
-          WHEN a.technician_id IS NULL THEN NULL
-          ELSE json_build_object(
-            'id', u3.pk_user_id,
-            'full_name', u3.full_name,
-            'phone', u3.phone
-          )
-        END AS technician
-      FROM users.appointments a
-      LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
-      LEFT JOIN users.service_items s ON aps.service_id = s.id
-      LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id
-      LEFT JOIN users.tbl_users u2 ON a.receptionist_id = u2.pk_user_id
-      LEFT JOIN users.tbl_users u3 ON a.technician_id = u3.pk_user_id
-      WHERE 1=1
-      AND ($1::bigint IS NULL OR a.user_id = $1)
-      AND ($2::text IS NULL OR a.status = $2)
-      AND ($3::text IS NULL OR TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') >= TO_TIMESTAMP($3, 'HH24:MI DD/MM/YYYY'))
-      AND ($4::text IS NULL OR TO_TIMESTAMP(a.end_time, 'HH24:MI DD/MM/YYYY') <= TO_TIMESTAMP($4, 'HH24:MI DD/MM/YYYY'))
-      GROUP BY a.id, u.pk_user_id, u.full_name, u.phone, u2.pk_user_id, u2.full_name, u2.phone, u3.pk_user_id, u3.full_name, u3.phone
-      ORDER BY a.created_at DESC
-      LIMIT $5 OFFSET $6
-      "#,
-    );
+    let (appointment, pagination) =
+      common::get_appointments(&self.db, filter, list_options, None).await?;
 
-    let mut count_query = sqlx::query_scalar::<_, i64>(
-      r#"
-      SELECT COUNT(*) FROM users.appointments
-      WHERE 1=1
-      AND ($1::bigint IS NULL OR user_id = $1)
-      AND ($2::text IS NULL OR status = $2)
-      AND ($3::text IS NULL OR TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') >= TO_TIMESTAMP($3, 'HH24:MI DD/MM/YYYY'))
-      AND ($4::text IS NULL OR TO_TIMESTAMP(end_time, 'HH24:MI DD/MM/YYYY') <= TO_TIMESTAMP($4, 'HH24:MI DD/MM/YYYY'))
-      "#,
-    );
+    Ok((appointment, pagination))
+  }
 
-    let user_id = filter.as_ref().and_then(|f| f.user_id);
-    let status = filter.as_ref().and_then(|f| {
-      if f.status.as_deref().unwrap_or("").is_empty() { None } else { f.status.clone() }
-    });
-    let start_time = filter.as_ref().and_then(|f| {
-      if f.start_time.as_deref().unwrap_or("").is_empty() { None } else { f.start_time.clone() }
-    });
-    let end_time = filter.as_ref().and_then(|f| {
-      if f.end_time.as_deref().unwrap_or("").is_empty() { None } else { f.end_time.clone() }
-    });
+  async fn get_appointment_by_user_id(
+    &self,
+    user: UserWithPassword,
+  ) -> AppResult<Vec<Appointment>> {
+    let count_confirm = common::count_appointment_by_user_id_and_status(
+      &self.db,
+      user.pk_user_id,
+      "CONFIRMED".to_string(),
+    )
+    .await?;
+    if count_confirm > 0 {
+      let res = sqlx::query_as::<_, Appointment>(
+        r#"
+          SELECT * FROM users.appointments 
+          WHERE user_id = $1 
+          AND status = 'CONFIRMED' 
+          AND TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') > CURRENT_TIMESTAMP
+          ORDER BY TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') ASC
+        "#,
+      )
+      .bind(user.pk_user_id)
+      .fetch_all(&self.db)
+      .await?;
+      return Ok(res);
+    }
 
-    query =
-      query.bind(user_id).bind(status.clone()).bind(start_time.clone()).bind(end_time.clone());
+    let count_pending = common::count_appointment_by_user_id_and_status(
+      &self.db,
+      user.pk_user_id,
+      "PENDING".to_string(),
+    )
+    .await?;
 
-    count_query = count_query.bind(user_id).bind(status).bind(start_time).bind(end_time);
+    if count_pending > 0 {
+      let res = sqlx::query_as::<_, Appointment>(
+        r#"
+          SELECT * FROM users.appointments 
+          WHERE user_id = $1 
+          AND status = 'PENDING'
+          AND TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') > CURRENT_TIMESTAMP
+          ORDER BY TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') ASC
+        "#,
+      )
+      .bind(user.pk_user_id)
+      .fetch_all(&self.db)
+      .await?;
 
-    let list_options = list_options.unwrap_or_default();
-    let limit = list_options.limit.unwrap_or(50).min(500);
-    let offset = list_options.offset.unwrap_or(0);
+      return Ok(res);
+    }
 
-    query = query.bind(limit).bind(offset);
+    Ok(vec![])
+  }
 
-    let total_items =
-      count_query.fetch_one(&self.db).await.map_err(|err| AppError::BadRequest(err.to_string()))?;
+  async fn get_appointment_by_technician(
+    &self,
+    user: UserWithPassword,
+    filter: Option<AppointmentFilter>,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<AppointmentWithServices>, PaginationMetadata)> {
+    let (appointment, pagination) =
+      common::get_appointments(&self.db, filter, list_options, Some(user.pk_user_id)).await?;
 
-    let appointments =
-      query.fetch_all(&self.db).await.map_err(|err| AppError::BadRequest(err.to_string()))?;
-
-    let total_pages = (total_items as f64 / limit as f64).ceil() as u64;
-    let current_page = (offset / limit) + 1;
-
-    let metadata = PaginationMetadata {
-      total_items: total_items as u64,
-      current_page: current_page as u64,
-      per_page: limit as u64,
-      total_pages,
-    };
-
-    Ok((appointments, metadata))
+    Ok((appointment, pagination))
   }
 }

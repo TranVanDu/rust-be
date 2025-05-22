@@ -123,6 +123,7 @@ pub struct UserFilter {
   pub phone: Option<String>,
   pub is_active: Option<bool>,
   pub is_verify: Option<bool>,
+  pub role: Option<Role>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone)] // FilterNodes sẽ dùng OpValsString
@@ -134,6 +135,7 @@ pub struct UserFilterConvert {
   pub phone: Option<OpValsString>,
   pub is_active: Option<OpValsBool>,
   pub is_verify: Option<OpValsBool>,
+  pub role: Option<OpValsString>,
 }
 
 #[derive(Deserialize, Serialize, Debug, Clone, Copy, PartialEq, Eq, Type, ToSchema)]

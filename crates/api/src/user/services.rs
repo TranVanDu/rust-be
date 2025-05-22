@@ -1,18 +1,23 @@
 use super::UserService;
 use axum::{
-  Json,
+  Extension, Json,
   extract::{Path, Query, State},
 };
 use core_app::{AppResult, AppState};
-use domain::entities::{
-  common::PaginationOptions,
-  user::{
-    RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+use domain::{
+  entities::{
+    common::PaginationOptions,
+    user::{
+      RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+      UserWithPassword,
+    },
   },
+  services::user::UserUseCase,
 };
 pub use infra::database::schema::UserDmc;
-use infra::repositories::base::{
-  count, create, create_many, delete, get_by_id, get_by_sth, list, update,
+use infra::repositories::{
+  base::{count, create, create_many, delete, get_by_id, get_by_sth, list, update},
+  user::SqlxUserRepository,
 };
 use modql::filter::{ListOptions, OrderBys};
 use serde_json::{Value, json};
@@ -99,4 +104,24 @@ impl UserService {
 
     Ok(Json(count))
   }
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/technicians",
+    tag="User Service",
+    responses(
+        (status = 200, description = "successfully", body = Vec<User>),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_all_technician(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+) -> AppResult<Json<Vec<User>>> {
+  let user_repo = SqlxUserRepository { db: state.db.clone() };
+  let users = UserUseCase::get_all_technician(&user_repo, user).await?;
+
+  Ok(Json(users))
 }

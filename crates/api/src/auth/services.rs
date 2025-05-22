@@ -189,7 +189,7 @@ pub async fn verify_code_firebase_service(
 }
 
 #[utoipa::path(
-    post,
+    get,
     path = "/api/v1/auth/get-me",
     tag="Auth Service",
     responses(
