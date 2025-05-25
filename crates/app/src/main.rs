@@ -9,7 +9,7 @@ use axum::{
   http::{HeaderValue, header},
   middleware,
 };
-use core_app::{AppState, configs::ProdConfig};
+use core_app::{AppState, configs::AppConfig};
 use dotenv::dotenv;
 use infra::{
   database::Database,
@@ -65,7 +65,7 @@ async fn main() {
        header::CONTENT_TYPE, HeaderValue::from_static("application/octet-stream")
      );
 
-  let configs = ProdConfig::from_env().unwrap();
+  let configs = AppConfig::from_env().unwrap();
 
   let pool = Database::initialize_db(&configs.postgres.dsn, configs.postgres.max_conns).await;
   let state = AppState::new(pool.clone(), configs.clone());

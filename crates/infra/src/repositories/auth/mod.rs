@@ -84,7 +84,7 @@ pub async fn refresh_token<DMC>(
 where
   DMC: DB,
 {
-  let claims = decode_token::<Claims>(&req.refresh_token, &state.config.jwt_secret_key)?;
+  let claims = decode_token::<Claims>(&req.refresh_token, &state.config.token.jwt_secret_key)?;
 
   let user_id = claims.sub.parse::<i64>().map_err(|err| AppError::BadRequest(err.to_string()))?;
 
@@ -230,13 +230,13 @@ pub async fn verify_phone(
   )
   .await?;
 
-  let access_duration = Duration::minutes(state.config.access_token_set_password_minutes);
+  let access_duration = Duration::minutes(state.config.token.access_token_set_password_minutes);
   let access_claims = ClaimsSetPassword {
     sub: user.pk_user_id.to_string(),
     phone: req.phone.clone(),
     exp: (Utc::now() + access_duration).timestamp() as usize,
   };
-  let access_token = encode_token(&access_claims, &state.config.jwt_secret_key)?;
+  let access_token = encode_token(&access_claims, &state.config.token.jwt_secret_key)?;
 
   let state_clone = state.clone();
   let p_code = req.code.clone();
@@ -259,7 +259,7 @@ pub async fn set_password(
   state: Arc<AppState>,
   req: SetPasswordRequest,
 ) -> AppResult<SigninResponse> {
-  let claims = decode_token::<ClaimsSetPassword>(&req.token, &state.config.jwt_secret_key)?;
+  let claims = decode_token::<ClaimsSetPassword>(&req.token, &state.config.token.jwt_secret_key)?;
   let full_name = req.full_name.unwrap_or("".to_string());
 
   if claims.exp < Utc::now().timestamp() as usize {
@@ -387,13 +387,13 @@ pub async fn verify_code_firebase(
   )
   .await?;
 
-  let access_duration = Duration::minutes(state.config.access_token_set_password_minutes);
+  let access_duration = Duration::minutes(state.config.token.access_token_set_password_minutes);
   let access_claims = ClaimsSetPassword {
     sub: user.pk_user_id.to_string(),
     phone: req.phone.clone(),
     exp: (Utc::now() + access_duration).timestamp() as usize,
   };
-  let access_token = encode_token(&access_claims, &state.config.jwt_secret_key)?;
+  let access_token = encode_token(&access_claims, &state.config.token.jwt_secret_key)?;
 
   Ok(VerifyPhoneCodeResponse {
     user_id: user.pk_user_id,

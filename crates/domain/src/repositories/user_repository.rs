@@ -27,15 +27,19 @@ impl PreProcess for RequestCreateUser {
     }
 
     if let Some(email) = &self.email_address {
-      let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
-        .expect("Invalid regex pattern");
-      if !email_regex.is_match(email) {
-        return Err(AppError::BadRequest("Invalid email address format".to_string()));
-      }
-      if email.len() > 150 {
-        return Err(AppError::BadRequest(
-          "Email address must not exceed 150 characters".to_string(),
-        ));
+      if email.is_empty() {
+        self.email_address = None
+      } else {
+        let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
+          .expect("Invalid regex pattern");
+        if !email_regex.is_match(email) {
+          return Err(AppError::BadRequest("Invalid email address format".to_string()));
+        }
+        if email.len() > 150 {
+          return Err(AppError::BadRequest(
+            "Email address must not exceed 150 characters".to_string(),
+          ));
+        }
       }
     }
 
@@ -63,7 +67,20 @@ impl PreProcess for RequestUpdateUser {
       }
     }
 
+    if let Some(password_hash) = &self.password_hash {
+      if !password_hash.is_empty() {
+        self.password_hash = None;
+      } else {
+        self.password_hash =
+          Some(hash_password(password_hash).map_err(|err| AppError::BadRequest(err.to_string()))?);
+      }
+    }
+
     if let Some(email) = &self.email_address {
+      if email.is_empty() {
+        self.email_address = None;
+        return Ok(());
+      }
       let email_regex = Regex::new(r"^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$")
         .expect("Invalid regex pattern");
       if !email_regex.is_match(email) {
@@ -74,11 +91,6 @@ impl PreProcess for RequestUpdateUser {
           "Email address must not exceed 150 characters".to_string(),
         ));
       }
-    }
-
-    if let Some(password_hash) = &self.password_hash {
-      self.password_hash =
-        Some(hash_password(password_hash).map_err(|err| AppError::BadRequest(err.to_string()))?);
     }
 
     Ok(())
@@ -99,7 +111,9 @@ fn convert_user_filter(filter: UserFilter) -> UserFilterConvert {
     pk_user_id: filter.pk_user_id.map(OpValsInt64::from),
     user_name: filter.user_name.map(OpValsString::from),
     email_address: filter.email_address.map(OpValsString::from),
-    phone: filter.phone.filter(|s| !s.trim().is_empty())
+    phone: filter
+      .phone
+      .filter(|s| !s.trim().is_empty())
       .map(|s| OpValsString(vec![OpValString::Ilike(format!("%{}%", s))])),
     full_name: filter
       .full_name

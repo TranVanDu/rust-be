@@ -30,7 +30,7 @@ pub async fn mw_auth(
     AppError::Unauthorized("Missing or invalid token".into())
   })?;
 
-  let decoding_key = DecodingKey::from_secret(state.config.jwt_secret_key.as_ref());
+  let decoding_key = DecodingKey::from_secret(state.config.token.jwt_secret_key.as_ref());
   let validation = Validation::default();
 
   let token_data = decode::<Claims>(&token, &decoding_key, &validation)

@@ -33,14 +33,14 @@ pub fn generate_auth_tokens(
   state: &Arc<AppState>,
 ) -> AppResult<(String, String, DateTime<Utc>)> {
   // Access Token
-  let access_duration = Duration::days(state.config.access_token_duration_days);
+  let access_duration = Duration::days(state.config.token.access_token_duration_days);
   let access_claims = generate_claims(user_id, role, access_duration);
-  let access_token = encode_token(&access_claims, state.config.jwt_secret_key.as_ref())?;
+  let access_token = encode_token(&access_claims, state.config.token.jwt_secret_key.as_ref())?;
 
   // Refresh Token
-  let refresh_duration = Duration::days(state.config.refresh_token_duration_days);
+  let refresh_duration = Duration::days(state.config.token.refresh_token_duration_days);
   let refresh_claims = generate_claims(user_id, role, refresh_duration);
-  let refresh_token = encode_token(&refresh_claims, state.config.jwt_secret_key.as_ref())?;
+  let refresh_token = encode_token(&refresh_claims, state.config.token.jwt_secret_key.as_ref())?;
   let refresh_expires_at = Utc::now() + refresh_duration;
 
   Ok((access_token, refresh_token, refresh_expires_at))
@@ -197,7 +197,7 @@ pub async fn handle_phone_code(
   .bind(&input.phone)
   .bind(&code)
   .bind(input.user_id)
-  .bind(Utc::now() + Duration::minutes(state.config.phone_code_ttl_minutes))
+  .bind(Utc::now() + Duration::minutes(state.config.token.phone_code_ttl_minutes))
   .execute(&state.db)
   .await
   .map(|_| ()) // Discard the result count

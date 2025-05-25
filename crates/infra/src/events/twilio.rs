@@ -9,9 +9,9 @@ pub async fn send_sms_via_twilio(
   phone_number: &str,
   code: &str,
 ) -> Result<(), reqwest::Error> {
-  let account_sid = state.config.twilio_account_sid.as_str();
-  let auth_token = state.config.twilio_auth_token.as_str();
-  let from_number = state.config.twilio_from_number.as_str();
+  let account_sid = state.config.twilio.account_sid.as_str();
+  let auth_token = state.config.twilio.auth_token.as_str();
+  let from_number = state.config.twilio.from_number.as_str();
 
   let client = reqwest::Client::new();
   let sms = TwilioSms {

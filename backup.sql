@@ -11,19 +11,22 @@ SET standard_conforming_strings = on;
 -- Roles
 --
 
-CREATE ROLE postgres;
+DO
+$do$
+BEGIN
+   IF NOT EXISTS (
+      SELECT FROM pg_catalog.pg_roles
+      WHERE  rolname = 'postgres') THEN
+      CREATE ROLE postgres;
+   END IF;
+END
+$do$;
+
 ALTER ROLE postgres WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN REPLICATION BYPASSRLS PASSWORD 'SCRAM-SHA-256$4096:0PF2jgKG7mESfFws9fYFLw==$mL7jO/QbrOSPIx6RmLjZdAyCL7VyCi5firFgEick60I=:KCIVlO6Me4AV/Upn7D2cbTL4D7qQ4oAh0R6pZtHGFn4=';
 
 --
 -- User Configurations
 --
-
-
-
-
-
-
-
 
 --
 -- Databases
@@ -45,7 +48,6 @@ ALTER ROLE postgres WITH SUPERUSER INHERIT CREATEROLE CREATEDB LOGIN REPLICATION
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -74,7 +76,6 @@ SET row_security = off;
 SET statement_timeout = 0;
 SET lock_timeout = 0;
 SET idle_in_transaction_session_timeout = 0;
-SET transaction_timeout = 0;
 SET client_encoding = 'UTF8';
 SET standard_conforming_strings = on;
 SELECT pg_catalog.set_config('search_path', '', false);
@@ -1101,11 +1102,9 @@ ALTER TABLE ONLY users.service_items
     ADD CONSTRAINT service_items_parent_service_id_fkey FOREIGN KEY (parent_service_id) REFERENCES users.services(id) ON DELETE CASCADE;
 
 
---
 -- PostgreSQL database dump complete
 --
 
---
 -- PostgreSQL database cluster dump complete
 --
 

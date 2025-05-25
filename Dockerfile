@@ -4,7 +4,7 @@ FROM rust:1.83.0-alpine AS common-builder
 # Set working directory
 WORKDIR /usr/src/app
 
-# Set build arguments (though not used in the build steps, good to keep if needed externally)
+# Set build arguments
 ARG TARGETARCH
 ARG RUST_VERSION=1.83.0
 
@@ -12,18 +12,19 @@ ARG RUST_VERSION=1.83.0
 ENV RUSTUP_UPDATE_ROOT=""
 ENV RUSTUP_DIST_SERVER=""
 
-# Set environment variables for linking (keep CC, AR, RANLIB)
-# REMOVED: ENV RUSTFLAGS="-C target-feature=-crt-static"
-ENV CC=musl-gcc
+# Set environment variables for linking
+ENV CC=gcc
 ENV AR=ar
 ENV RANLIB=ranlib
+ENV RUSTFLAGS="-C target-cpu=native"
+ENV OPENSSL_DIR=/usr
+ENV OPENSSL_INCLUDE_DIR=/usr/include
+ENV OPENSSL_LIB_DIR=/usr/lib
+ENV PKG_CONFIG_PATH=/usr/lib/pkgconfig
 
-# Install build dependencies in one consolidated step
+# Install build dependencies
 RUN apk add --no-cache \
     musl-dev \
-    musl-tools \
-    musl-gcc \
-    musl-libc-dev \
     gcc \
     g++ \
     cmake \
@@ -36,9 +37,11 @@ RUN apk add --no-cache \
     pkgconf \
     postgresql-dev \
     libjpeg-turbo-dev \
-    openssl-dev
+    openssl-dev \
+    git \
+    perl
 
-# Install cargo-chef and sqlx-cli for dependency caching and migrations
+# Install cargo-chef and sqlx-cli
 RUN cargo install cargo-chef --locked && \
     cargo install sqlx-cli --no-default-features --features postgres
 
@@ -66,11 +69,8 @@ RUN cargo chef cook --release --recipe-path recipe.json
 
 # Copy source code and migrations
 COPY . .
-COPY migrations ./migrations
 
-# Build the application with optimizations
-# REMOVED: -C target-feature=-crt-static from RUSTFLAGS here too
-ENV RUSTFLAGS="-C target-cpu=native"
+# Build the application
 RUN cargo build --release --bin app && \
     # Clean up build artifacts
     rm -rf target/release/build target/release/deps target/release/.fingerprint/app-*
@@ -81,7 +81,7 @@ FROM rust:1.83.0-alpine
 # Create non-root user
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 
-# Install only necessary runtime dependencies
+# Install runtime dependencies
 RUN apk add --no-cache \
     libpq \
     libjpeg-turbo \
@@ -91,40 +91,32 @@ RUN apk add --no-cache \
     ca-certificates \
     tzdata \
     postgresql-client \
-    # Add musl runtime libraries for completeness, though often included by base
-    musl
+    musl-dev \
+    gcc \
+    openssl-dev \
+    postgresql-dev \
+    pkgconfig \
+    make \
+    cmake \
+    git \
+    curl \
+    build-base
 
-# Install sqlx-cli (needed for migrations in entrypoint)
-# This was causing issues in the builder stage, so it's good it's in a later stage now.
-# However, if your entrypoint *relies* on sqlx-cli, it must be installed here.
-# If the entrypoint is run on the builder image (which is not what you have here),
-# then sqlx-cli would only be needed there.
-# Since you copy sqlx-cli into the final image via a `cargo install` in Stage 1,
-# you don't need to re-install it here in Stage 4.
-# Let's remove the re-install here as it's already done in common-builder.
-# RUN cargo install sqlx-cli --no-default-features --features postgres # <-- REMOVE THIS LINE
+# Install sqlx-cli
+RUN cargo install sqlx-cli --no-default-features --features postgres
 
-# Create necessary directories and set permissions
+# Create necessary directories
 RUN mkdir -p /usr/src/app/uploads && \
     mkdir -p /usr/src/app/config && \
     mkdir -p /usr/src/app/migrations && \
     chown -R appuser:appgroup /usr/src/app
 
 # Copy only required files from builder
-# The sqlx-cli binary installed in common-builder (Stage 1) will be available in the final image
-# because common-builder is the base for planner and builder, and builder is the source for runtime.
-# This means /usr/local/cargo/bin is present in the final image.
 COPY --from=builder /usr/src/app/target/release/app /usr/local/bin/app
 COPY --from=builder /usr/src/app/migrations /usr/src/app/migrations
 COPY --from=builder /usr/src/app/backup.sql /usr/src/app/backup.sql
-# Ensure these paths exist in the builder stage if they don't, or handle them being optional.
-# For example, if uploads is just a runtime directory, you shouldn't copy it from builder.
-# If config/firebase-service-account.json is *not* built/generated, it won't exist in builder.
-# You might need to add COPY statements for these files from your local context in an earlier stage,
-# or handle their absence. Assuming they are in your local context.
 COPY uploads /usr/src/app/uploads 
 COPY config/firebase-service-account.json /usr/src/app/config/firebase-service-account.json 
-
 
 # Set permissions
 RUN chmod +x /usr/local/bin/app && \
@@ -142,10 +134,10 @@ RUN chmod +x /usr/local/bin/docker-entrypoint.sh
 USER appuser
 
 # Set environment variables
-ENV ENV=production \
-    RUST_LOG=info \
-    RUST_BACKTRACE=0 \
-    TZ=UTC
+ENV ENV=production
+ENV RUST_LOG=info
+ENV RUST_BACKTRACE=0
+ENV TZ=UTC
 
 # Expose port and set healthcheck
 EXPOSE 8080
@@ -154,4 +146,4 @@ HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
 
 # Use entrypoint script
 ENTRYPOINT ["docker-entrypoint.sh"]
-CMD ["app"]
+CMD ["/usr/local/bin/app"]
