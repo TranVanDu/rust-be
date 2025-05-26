@@ -111,6 +111,9 @@ RUN mkdir -p /usr/src/app/uploads && \
     mkdir -p /usr/src/app/migrations && \
     chown -R appuser:appgroup /usr/src/app
 
+# Set working directory
+WORKDIR /usr/src/app
+
 # Copy only required files from builder
 COPY --from=builder /usr/src/app/target/release/app /usr/local/bin/app
 COPY --from=builder /usr/src/app/migrations /usr/src/app/migrations

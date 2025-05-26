@@ -41,5 +41,4 @@ sqlx migrate run
 
 # Start the application
 echo "Starting application..."
-cd /usr/local/bin
-exec "$@" 
+exec "$@"
