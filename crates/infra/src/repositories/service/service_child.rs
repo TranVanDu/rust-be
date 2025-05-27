@@ -99,6 +99,7 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     _: UserWithPassword,
     data: CreateServiceChildRequest,
   ) -> AppResult<ServiceChild> {
+    tracing::info!("{:?}", data);
     let fields = data.not_none_sea_fields();
     let (columns, sea_values) = fields.for_sea_insert();
 
@@ -113,6 +114,9 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     query.returning(Query::returning().column(Asterisk));
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
+
+    tracing::info!("SQL: {}", sql);
+    tracing::info!("Values: {:?}", values);
 
     let service =
       sqlx::query_as_with::<_, ServiceChild, _>(&sql, values).fetch_one(&self.db).await?;
@@ -186,9 +190,10 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
     let total_items = sqlx::query_scalar_with::<_, i64, _>(&sql, values.clone())
-      .fetch_one(&self.db)
+      .fetch_optional(&self.db)
       .await
-      .map_err(|err| AppError::BadRequest(err.to_string()))?;
+      .map_err(|err| AppError::BadRequest(err.to_string()))?
+      .unwrap_or(0);
 
     let mut list_options = list_options.unwrap_or_default();
     let limit = list_options.limit.unwrap_or(50).min(LIST_LIMIT_MAX);

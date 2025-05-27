@@ -28,7 +28,8 @@ macro_rules! gen_com_fn {
       count as repo_count,
       update as repo_update,
       delete as repo_delete,
-      delete_many as repo_delete_many
+      delete_many as repo_delete_many,
+      generateListoption
     };
 
     $(
@@ -150,13 +151,7 @@ macro_rules! gen_com_fn {
         Query(list_options): Query<PaginationOptions>,
         State(state): State<Arc<AppState>>,
       ) -> AppResult<Json<Value>> {
-        let list_options = ListOptions {
-          limit: list_options.per_page.map(|limit| limit as i64),
-          offset: list_options.page.map(|page| {
-            if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
-          }),
-          order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
-        };
+        let list_options = generateListoption(list_options);
 
         // Preprocess filter
         let filter = query.pre_process_r().await?;

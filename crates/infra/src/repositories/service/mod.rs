@@ -119,6 +119,7 @@ impl ServiceRepository for SqlxServiceRepository {
     _: UserWithPassword,
     data: CreateServiceRequest,
   ) -> AppResult<Service> {
+    tracing::info!("{:?}", data);
     let fields = data.not_none_sea_fields();
     let (columns, sea_values) = fields.for_sea_insert();
 
@@ -131,7 +132,16 @@ impl ServiceRepository for SqlxServiceRepository {
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let service = sqlx::query_as_with::<_, Service, _>(&sql, values).fetch_one(&self.db).await?;
+    let service = sqlx::query_as_with::<_, Service, _>(&sql, values)
+      .fetch_one(&self.db)
+      .await
+      .map_err(|err| {
+        if err.to_string().contains("duplicate key value violates unique constraint") {
+          AppError::BadRequest("Service with this information already exists".to_string())
+        } else {
+          AppError::BadRequest(err.to_string())
+        }
+      })?;
 
     Ok(service)
   }
@@ -142,6 +152,7 @@ impl ServiceRepository for SqlxServiceRepository {
     id: i64,
     data: UpdateServiceRequest,
   ) -> AppResult<Service> {
+    let image = data.image.clone();
     let service_past = sqlx::query_as::<_, Service>(
       r#"
       SELECT * FROM users.services WHERE id = $1
@@ -167,7 +178,7 @@ impl ServiceRepository for SqlxServiceRepository {
     let service = sqlx::query_as_with::<_, Service, _>(&sql, values).fetch_one(&self.db).await?;
 
     tokio::spawn(async move {
-      if service_past.image.is_some() {
+      if service_past.image.is_some() && image.is_some() {
         let image_path = service_past.image.unwrap();
         let image_repo = Arc::new(LocalImageService);
         image_repo.remove_old_image(image_path.as_str()).await.unwrap();
@@ -198,11 +209,6 @@ impl ServiceRepository for SqlxServiceRepository {
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let total_items = sqlx::query_scalar_with::<_, i64, _>(&sql, values.clone())
-      .fetch_one(&self.db)
-      .await
-      .map_err(|err| AppError::BadRequest(err.to_string()))?;
-
     let mut list_options = list_options.unwrap_or_default();
     let limit = list_options.limit.unwrap_or(50).min(LIST_LIMIT_MAX);
     list_options.limit = Some(limit);
@@ -213,10 +219,16 @@ impl ServiceRepository for SqlxServiceRepository {
 
     list_options.apply_to_sea_query(&mut query);
 
-    let entities = sqlx::query_as_with::<_, Service, _>(&sql, values)
+    let entities = sqlx::query_as_with::<_, Service, _>(&sql, values.clone())
       .fetch_all(&self.db)
       .await
       .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    let total_items = sqlx::query_scalar_with::<_, i64, _>(&sql, values.clone())
+      .fetch_optional(&self.db)
+      .await
+      .map_err(|err| AppError::BadRequest(err.to_string()))?
+      .unwrap_or(0);
 
     let total_pages = (total_items as u64).div_ceil(per_page);
 

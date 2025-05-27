@@ -68,7 +68,7 @@ impl PreProcess for RequestUpdateUser {
     }
 
     if let Some(password_hash) = &self.password_hash {
-      if !password_hash.is_empty() {
+      if password_hash.is_empty() {
         self.password_hash = None;
       } else {
         self.password_hash =

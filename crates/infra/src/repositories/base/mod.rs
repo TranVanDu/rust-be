@@ -1,11 +1,11 @@
 pub mod macros_untils;
 use crate::database::schema::DB;
 use core_app::{AppResult, errors::AppError};
-use domain::entities::common::PaginationMetadata;
+use domain::entities::common::{PaginationMetadata, PaginationOptions};
 use modql::{
   SIden,
   field::HasSeaFields,
-  filter::{FilterGroups, ListOptions},
+  filter::{FilterGroups, ListOptions, OrderBy},
 };
 use sea_query::{Asterisk, Condition, Expr, Iden, IntoIden, PostgresQueryBuilder, Query};
 use sea_query_binder::SqlxBinder;
@@ -321,4 +321,30 @@ pub fn compute_list_options<DMC>(
   let page = (offset / limit) + 1;
 
   Ok((list_options, page as u64))
+}
+
+pub fn generateListoption(list_options: PaginationOptions) -> ListOptions {
+  let list_options = ListOptions {
+    limit: list_options.per_page.map(|limit| limit as i64),
+    offset: list_options.page.map(|page| {
+      if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+    }),
+    order_bys: list_options.order_by.map(|order_by| {
+      {
+        let parts: Vec<&str> = order_by.split(':').collect();
+        if parts.len() == 2 {
+          let (col, dir) = (parts[0], parts[1]);
+          match dir.to_lowercase().as_str() {
+            "desc" => OrderBy::Desc(col.to_string()),
+            _ => OrderBy::Asc(col.to_string()),
+          }
+        } else {
+          OrderBy::Asc(order_by)
+        }
+      }
+      .into()
+    }),
+  };
+
+  list_options
 }
