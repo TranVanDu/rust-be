@@ -6,6 +6,7 @@
 /.vscode
 .DS_Store
 .env
+*.code-workspace
 
 # Firebase service account
 config/firebase-service-account.json

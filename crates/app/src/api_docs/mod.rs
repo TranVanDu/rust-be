@@ -82,6 +82,9 @@ use utoipa_swagger_ui::SwaggerUi;
     api::notification::services::get_by_id,
     api::notification::services::get_list,
 
+    // statistics
+    api::statistics::services::get_admin_statistics,
+    api::statistics::services::get_receptionist_statistics,
   ),
   tags(
     (name = "Auth Service", description = "Auth service endpoints"),
@@ -93,7 +96,7 @@ use utoipa_swagger_ui::SwaggerUi;
     (name = "Notification Service", description = "Notification Service endpoints"),
     (name = "Notification token Service", description = "Notification token Service endpoints"),
     (name = "Chat Service", description = "Chat service endpoints"),
-    
+    (name = "Statistics Service", description = "Statistics service endpoints"),
   ),
   security(
     ("BearerAuth" = [])

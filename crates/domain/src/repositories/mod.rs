@@ -7,4 +7,5 @@ pub mod notification_repository;
 pub mod profile_repository;
 pub mod service_child_repository;
 pub mod service_repository;
+pub mod statistics_repository;
 pub mod user_repository;

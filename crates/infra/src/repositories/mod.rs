@@ -7,4 +7,5 @@ pub mod notification;
 pub mod notification_token;
 pub mod profile;
 pub mod service;
+pub mod statistics;
 pub mod user;
