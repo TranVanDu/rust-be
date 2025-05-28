@@ -4,7 +4,9 @@ use core_app::{AppResult, AppState, errors::AppError};
 use domain::entities::common::PaginationOptions;
 use domain::entities::notification::Notification;
 use domain::entities::notification_token::{NotificationToken, PayloadNotificationToken};
+use domain::entities::zalo::ZaloTemplate;
 use domain::services::notification_token::NotificationTokenUseCase;
+use infra::events::zalo::ZaloService;
 use infra::firebase::NotificationService;
 use infra::repositories::notification_token::SqlxNotiTokenRepository;
 use modql::filter::{ListOptions, OrderBys};
@@ -181,7 +183,7 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
 
   tracing::info!("all_tokens: {:#?}", all_tokens);
 
-  let response = noti_service
+  let _ = noti_service
     .send_notification(
       Notification {
         id: 0,
@@ -198,7 +200,15 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
       all_tokens.clone(),
     )
     .await
-    .unwrap();
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
   Ok(Json(all_tokens))
+}
+
+pub async fn test_zalo(State(state): State<Arc<AppState>>) -> AppResult<Json<()>> {
+  let zalo_service = ZaloService::new();
+  let templates = ZaloService::send_message_otp(&zalo_service, &state.db, "+84961483800", "636363")
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+  Ok(Json(templates))
 }

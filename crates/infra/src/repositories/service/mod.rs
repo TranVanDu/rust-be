@@ -65,6 +65,7 @@ impl ServiceRepository for SqlxServiceRepository {
       price: service.price,
       image: service.image,
       is_active: service.is_active,
+      is_signature: service.is_signature,
       service_type: service.service_type,
       created_at: service.created_at,
       updated_at: service.updated_at,
@@ -120,6 +121,7 @@ impl ServiceRepository for SqlxServiceRepository {
     data: CreateServiceRequest,
   ) -> AppResult<Service> {
     tracing::info!("{:?}", data);
+    let image = data.image.clone();
     let fields = data.not_none_sea_fields();
     let (columns, sea_values) = fields.for_sea_insert();
 
@@ -136,6 +138,13 @@ impl ServiceRepository for SqlxServiceRepository {
       .fetch_one(&self.db)
       .await
       .map_err(|err| {
+        tokio::spawn(async move {
+          if image.is_some() {
+            let image_path = image.unwrap();
+            let image_repo = Arc::new(LocalImageService);
+            image_repo.remove_old_image(image_path.as_str()).await.unwrap();
+          }
+        });
         if err.to_string().contains("duplicate key value violates unique constraint") {
           AppError::BadRequest("Service with this information already exists".to_string())
         } else {
@@ -153,6 +162,7 @@ impl ServiceRepository for SqlxServiceRepository {
     data: UpdateServiceRequest,
   ) -> AppResult<Service> {
     let image = data.image.clone();
+    let image2 = data.image.clone();
     let service_past = sqlx::query_as::<_, Service>(
       r#"
       SELECT * FROM users.services WHERE id = $1
@@ -175,7 +185,19 @@ impl ServiceRepository for SqlxServiceRepository {
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let service = sqlx::query_as_with::<_, Service, _>(&sql, values).fetch_one(&self.db).await?;
+    let service = sqlx::query_as_with::<_, Service, _>(&sql, values)
+      .fetch_one(&self.db)
+      .await
+      .map_err(|err| {
+        tokio::spawn(async move {
+          if image2.is_some() {
+            let image_path = image2.unwrap();
+            let image_repo = Arc::new(LocalImageService);
+            image_repo.remove_old_image(image_path.as_str()).await.unwrap();
+          }
+        });
+        AppError::BadRequest(err.to_string())
+      })?;
 
     tokio::spawn(async move {
       if service_past.image.is_some() && image.is_some() {
@@ -199,7 +221,9 @@ impl ServiceRepository for SqlxServiceRepository {
     let mut query = Query::select();
     query
       .from(TableRef::SchemaTable(SIden("users").into_iden(), SIden("services").into_iden()))
-      .columns([Asterisk]);
+      .columns([Asterisk])
+      .order_by(SIden("is_signature").into_iden(), sea_query::Order::Desc)
+      .order_by(SIden("id").into_iden(), sea_query::Order::Asc);
 
     if let Some(filter_value) = filter.clone() {
       let filters: FilterGroups = filter_value.into();

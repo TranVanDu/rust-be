@@ -1,4 +1,5 @@
 use anyhow::Result;
+use core_app::errors::AppError;
 use domain::entities::notification::Notification;
 use gcp_auth::{CustomServiceAccount, TokenProvider};
 use reqwest::Client;
@@ -13,7 +14,8 @@ pub struct NotificationService {
 
 impl NotificationService {
   pub async fn new() -> Result<Self> {
-    let service_account = CustomServiceAccount::from_file("config/firebase-service-account.json")?;
+    let service_account = CustomServiceAccount::from_file("config/firebase-service-account.json")
+      .map_err(|err| AppError::BadRequest(err.to_string()))?;
     let project_id =
       service_account.project_id().ok_or(anyhow::anyhow!("No project ID found"))?.to_string();
 
@@ -26,8 +28,11 @@ impl NotificationService {
     tokens: Vec<String>,
   ) -> Result<bool> {
     let mut success = true;
-    let auth_token =
-      self.token_provider.token(&["https://www.googleapis.com/auth/firebase.messaging"]).await?;
+    let auth_token = self
+      .token_provider
+      .token(&["https://www.googleapis.com/auth/firebase.messaging"])
+      .await
+      .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
     for token in tokens {
       let mut message = json!({

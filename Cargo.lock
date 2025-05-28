@@ -1649,6 +1649,7 @@ dependencies = [
  "chrono",
  "core_app",
  "domain",
+ "dotenv",
  "fast_image_resize",
  "gcp_auth",
  "image",

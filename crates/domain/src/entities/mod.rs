@@ -9,3 +9,4 @@ pub mod service;
 pub mod service_child;
 pub mod statistics;
 pub mod user;
+pub mod zalo;

@@ -111,6 +111,8 @@ impl NotificationRepository for SqlxNotificationRepository {
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
+    tracing::info!("Notifications: {:#?}", notifications);
+
     let total_items: i64 = sqlx::query_scalar(
       r#"
       SELECT COUNT(*) FROM users.notifications

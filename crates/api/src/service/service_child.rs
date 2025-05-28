@@ -193,6 +193,7 @@ pub async fn create_service(
     description_ko: None,
     price: Some(0),
     is_active: Some(true),
+    is_signature: Some(false),
     service_type: None,
     image: None,
   };
@@ -256,6 +257,19 @@ pub async fn create_service(
             AppError::BadRequest(format!("Invalid is_active format: {}", err))
           })?;
           payload.is_active = Some(is_active);
+        }
+      },
+      "is_signature" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let is_signature = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.is_signature = Some(is_signature);
         }
       },
       _ => {
@@ -382,6 +396,7 @@ pub async fn update_service(
     description_ko: None,
     price: None,
     is_active: None,
+    is_signature: None,
     service_type: None,
     image: None,
   };
@@ -445,6 +460,19 @@ pub async fn update_service(
             AppError::BadRequest(format!("Invalid is_active format: {}", err))
           })?;
           payload.is_active = Some(is_active);
+        }
+      },
+      "is_signature" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let is_signature = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.is_signature = Some(is_signature);
         }
       },
       _ => {

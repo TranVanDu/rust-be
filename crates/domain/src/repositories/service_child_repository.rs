@@ -78,6 +78,7 @@ fn convert_service_child_filter(filter: ServiceChildFilter) -> ServiceChildFilte
       .map(|s| OpValsString(vec![OpValString::Ilike(format!("%{}%", s))])),
     price: filter.price.map(OpValsInt32::from),
     is_active: filter.is_active.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    is_signature: filter.is_signature.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
     parent_service_id: filter.parent_service_id.map(OpValsInt64::from),
   }
 }

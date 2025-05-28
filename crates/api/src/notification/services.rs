@@ -1,3 +1,4 @@
+use axum::Extension;
 use axum::extract::{Path, Query};
 use axum::{Json, extract::State};
 use core_app::{AppResult, AppState};
@@ -6,6 +7,7 @@ use domain::entities::notification::{
   CreateNotification, Notification, NotificationFilter, UpdateNotification,
 };
 use domain::entities::notification_token::NotificationToken;
+use domain::entities::user::UserWithPassword;
 use domain::services::notification::NotificationUseCase;
 use infra::repositories::notification::SqlxNotificationRepository;
 use modql::filter::{ListOptions, OrderBys};
@@ -140,4 +142,80 @@ pub async fn get_list(
   });
 
   Ok(Json(response))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications/user",
+    tag="Notification Service",
+    params(
+          ("page" = Option<u64>, Query, description = "Page number"),
+          ("per_page" = Option<u64>, Query, description = "Number of items to return"),
+          ("order_by" = Option<String>, Query, description = "Field to order by"),
+          ("is_read" = Option<bool>, Query, description = "Filter by read status"),
+        ),
+    responses(
+        (status = 200, description = "Notifications retrieved successfully", body = Vec<Notification>),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_user_notifications(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+  Query(list_options): Query<PaginationOptions>,
+  Query(filter): Query<NotificationFilter>,
+) -> AppResult<Json<Value>> {
+  let list_options = ListOptions {
+    limit: list_options.per_page.map(|limit| limit as i64),
+    offset: list_options.page.map(|page| {
+      if page == 0 { 0i64 } else { ((page - 1) * list_options.per_page.unwrap_or(10)) as i64 }
+    }),
+    order_bys: list_options.order_by.map(|order_by| OrderBys::from(order_by)),
+  };
+  let repo = SqlxNotificationRepository { db: state.db.clone() };
+
+  // Get user_id from auth context
+  let user_id = user.pk_user_id;
+  let mut filter = filter;
+  filter.user_id = Some(user_id);
+
+  let (notifications, pagination) =
+    NotificationUseCase::list(&repo, filter, Some(list_options)).await?;
+
+  let response = json!({
+      "data": notifications,
+      "metadata": pagination
+  });
+
+  Ok(Json(response))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/notifications/unread/count",
+    tag="Notification Service",
+    responses(
+        (status = 200, description = "Unread notifications count retrieved successfully", body = Value),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_unread_count(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+) -> AppResult<Json<Value>> {
+  let repo = SqlxNotificationRepository { db: state.db.clone() };
+  let filter = NotificationFilter {
+    user_id: Some(user.pk_user_id),
+    is_read: Some(false),
+    notification_type: None,
+  };
+
+  let (notifications, _) = NotificationUseCase::list(&repo, filter, None).await?;
+  let count = notifications.len();
+
+  Ok(Json(json!({
+    "count": count
+  })))
 }

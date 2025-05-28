@@ -1,6 +1,6 @@
 use crate::{
   database::schema::{DB, UserDmc},
-  events::twilio::send_sms_via_twilio,
+  events::zalo::ZaloService,
   repositories::base::get_by_sth,
 };
 use chrono::{DateTime, Duration, Utc};
@@ -203,9 +203,10 @@ pub async fn handle_phone_code(
   .map(|_| ()) // Discard the result count
   .map_err(|e| AppError::BadRequest(e.to_string()))?;
 
-  // send_sms_via_twilio(state, input.phone.as_ref(), code.as_ref())
-  //   .await
-  //   .map_err(|err| AppError::BadRequest(err.to_string()))?;
+  let zalo_service = ZaloService::new();
+  let _ = ZaloService::send_message_otp(&zalo_service, &state.db, &input.phone, &code)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
   Ok(())
 }

@@ -16,4 +16,5 @@ pub fn routes() -> Router<Arc<AppState>> {
     .route("/notification-tokens/{id}", patch(services::update))
     .route("/notification-tokens-by-user-id/{id}", get(services::get_token_by_user_id))
     .route("/test-notification", get(services::test))
+    .route("/test-zalo", get(services::test_zalo))
 }

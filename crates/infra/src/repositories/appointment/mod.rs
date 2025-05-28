@@ -110,6 +110,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           "appointment_id": res.id,
           "user_name": user_full_name,
           "start_time": res.start_time,
+          "user_id": res.user_id
         })),
       )
       .await

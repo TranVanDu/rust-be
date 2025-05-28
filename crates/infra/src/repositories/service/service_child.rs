@@ -100,6 +100,7 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     data: CreateServiceChildRequest,
   ) -> AppResult<ServiceChild> {
     tracing::info!("{:?}", data);
+    let image = data.image.clone();
     let fields = data.not_none_sea_fields();
     let (columns, sea_values) = fields.for_sea_insert();
 
@@ -118,8 +119,19 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     tracing::info!("SQL: {}", sql);
     tracing::info!("Values: {:?}", values);
 
-    let service =
-      sqlx::query_as_with::<_, ServiceChild, _>(&sql, values).fetch_one(&self.db).await?;
+    let service = sqlx::query_as_with::<_, ServiceChild, _>(&sql, values)
+      .fetch_one(&self.db)
+      .await
+      .map_err(|err| {
+        tokio::spawn(async move {
+          if image.is_some() {
+            let image_path = image.unwrap();
+            let image_repo = Arc::new(LocalImageService);
+            image_repo.remove_old_image(image_path.as_str()).await.unwrap();
+          }
+        });
+        AppError::BadRequest(err.to_string())
+      })?;
 
     Ok(service)
   }
@@ -130,6 +142,8 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     id: i64,
     data: UpdateServiceChildRequest,
   ) -> AppResult<ServiceChild> {
+    let image = data.image.clone();
+    let image2 = data.image.clone();
     let service_past = sqlx::query_as::<_, ServiceChild>(
       r#"
       SELECT * FROM users.service_items WHERE id = $1    
@@ -152,11 +166,22 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
 
     let (sql, values) = query.build_sqlx(PostgresQueryBuilder);
 
-    let service =
-      sqlx::query_as_with::<_, ServiceChild, _>(&sql, values).fetch_one(&self.db).await?;
+    let service = sqlx::query_as_with::<_, ServiceChild, _>(&sql, values)
+      .fetch_one(&self.db)
+      .await
+      .map_err(|err| {
+        tokio::spawn(async move {
+          if image.is_some() {
+            let image_path = image.unwrap();
+            let image_repo = Arc::new(LocalImageService);
+            image_repo.remove_old_image(image_path.as_str()).await.unwrap();
+          }
+        });
+        AppError::BadRequest(err.to_string())
+      })?;
 
     tokio::spawn(async move {
-      if service_past.image.is_some() {
+      if service_past.image.is_some() && image2.is_some() {
         let image_path = service_past.image.unwrap();
         let image_repo = Arc::new(LocalImageService);
         image_repo.remove_old_image(image_path.as_str()).await.unwrap();

@@ -29,3 +29,4 @@ turbojpeg.workspace = true
 sqlx.workspace = true
 gcp_auth.workspace = true
 anyhow.workspace = true
+dotenv.workspace = true
