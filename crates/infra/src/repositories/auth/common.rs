@@ -173,7 +173,7 @@ pub async fn handle_phone_code(
   // 2. Kiểm tra xem còn mã nào chưa hết hạn không
   let existing_active_code = sqlx::query_as::<_, PhoneCode>(
     r#"SELECT * FROM users.phone_codes 
-           WHERE user_id = $1 AND revoked = FALSE AND phone = $2"#,
+           WHERE user_id = $1 AND revoked = FALSE AND phone = $2 AND expires_at > NOW()"#,
   )
   .bind(input.user_id)
   .bind(&input.phone)
@@ -202,6 +202,8 @@ pub async fn handle_phone_code(
   .await
   .map(|_| ()) // Discard the result count
   .map_err(|e| AppError::BadRequest(e.to_string()))?;
+
+  tracing::info!("code: {}", code);
 
   let zalo_service = ZaloService::new();
   let _ = ZaloService::send_message_otp(&zalo_service, &state.db, &input.phone, &code)

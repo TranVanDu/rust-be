@@ -9,6 +9,7 @@ use domain::{
     service::{
       CreateServiceRequest, Service, ServiceFilter, ServiceWithChild, UpdateServiceRequest,
     },
+    service_child::ServiceChild,
     user::UserWithPassword,
   },
   services::service::ServiceUseCase,
@@ -103,6 +104,68 @@ pub async fn get_all_services(State(state): State<Arc<AppState>>) -> AppResult<J
   let services = ServiceUseCase::get_all_services(&service_repo).await?;
 
   Ok(Json(services))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/services/list-all-with-children",
+    tag="Services",
+    responses(
+        (status = 200, description = "successfully", body = Vec<ServiceChild>),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+
+pub async fn get_all_services_with_children(
+  State(state): State<Arc<AppState>>
+) -> AppResult<Json<Vec<ServiceChild>>> {
+  let service_repo = SqlxServiceRepository { db: state.db.clone() };
+  let services = ServiceUseCase::get_all_services_with_children(&service_repo).await?;
+
+  // Sort all services (both parent and children) by is_signature DESC and id ASC
+  let mut all_services = Vec::new();
+
+  // First collect all services (parent and children)
+  for service in services {
+    all_services.push(ServiceChild {
+      id: service.id,
+      parent_service_id: 0,
+      service_name: service.service_name,
+      service_name_en: service.service_name_en,
+      service_name_ko: service.service_name_ko,
+      description_ko: service.description_ko,
+      description_en: service.description_en,
+      description: service.description,
+      price: service.price,
+      image: service.image,
+      is_active: service.is_active,
+      is_signature: service.is_signature,
+      service_type: Some("parent".to_string()),
+      created_at: service.created_at,
+      updated_at: service.updated_at,
+    });
+
+    all_services.extend(service.child.into_iter().map(|child| ServiceChild {
+      id: child.id,
+      service_name: child.service_name,
+      service_name_en: child.service_name_en,
+      service_name_ko: child.service_name_ko,
+      description_ko: child.description_ko,
+      description_en: child.description_en,
+      description: child.description,
+      parent_service_id: child.parent_service_id,
+      price: child.price,
+      image: child.image,
+      service_type: Some("child".to_string()),
+      is_active: child.is_active,
+      is_signature: child.is_signature,
+      created_at: child.created_at,
+      updated_at: child.updated_at,
+    }));
+  }
+
+  Ok(Json(all_services))
 }
 
 #[utoipa::path(

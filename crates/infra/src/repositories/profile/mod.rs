@@ -54,16 +54,32 @@ impl ProfileRepository for SqlxProfileRepository {
     &self,
     user: UserWithPassword,
     refresh_token: Option<String>,
+    device_token: Option<String>,
   ) -> AppResult<bool> {
     let user_id = user.pk_user_id;
-    let db = self.db.clone();
 
     if let Some(refresh_token) = refresh_token {
       if !refresh_token.is_empty() {
+        let db = self.db.clone();
         tokio::spawn(async move {
           tokio::time::sleep(std::time::Duration::from_secs(3)).await;
           sqlx::query(r#"DELETE FROM users.refresh_tokens WHERE token = $1 and user_id = $2"#)
             .bind(refresh_token)
+            .bind(user_id)
+            .execute(&db)
+            .await
+            .unwrap();
+        });
+      }
+    }
+
+    if let Some(token) = device_token {
+      if !token.is_empty() {
+        let db = self.db.clone();
+        tokio::spawn(async move {
+          tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+          sqlx::query(r#"DELETE FROM users.notification_tokens WHERE token = $1 and user_id = $2"#)
+            .bind(token)
             .bind(user_id)
             .execute(&db)
             .await

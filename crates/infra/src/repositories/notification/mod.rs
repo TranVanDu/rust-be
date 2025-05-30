@@ -22,15 +22,16 @@ impl NotificationRepository for SqlxNotificationRepository {
     let notification = sqlx::query_as::<_, Notification>(
       r#"
       INSERT INTO users.notifications (
-        user_id, title, body, type, data, appointment_id, is_read, created_at, updated_at
+        user_id, title, body, receiver, notification_type, data, appointment_id, is_read, created_at, updated_at
       )
-      VALUES ($1, $2, $3, $4, $5, $6, false, $7, $7)
+      VALUES ($1, $2, $3, $4, $5, $6, $7, false, $8, $8)
       RETURNING *
       "#,
     )
     .bind(payload.user_id)
     .bind(payload.title)
     .bind(payload.body)
+    .bind(payload.receiver)
     .bind(payload.notification_type)
     .bind(payload.data)
     .bind(payload.appointment_id)
@@ -97,13 +98,15 @@ impl NotificationRepository for SqlxNotificationRepository {
       SELECT * FROM users.notifications
       WHERE ($1::bigint IS NULL OR user_id = $1)
       AND ($2::boolean IS NULL OR is_read = $2)
-      AND ($3::text IS NULL OR type = $3)
+      AND ($3::text IS NULL OR receiver = $3)
+      AND ($4::text IS NULL OR notification_type = $4)
       ORDER BY created_at DESC
-      LIMIT $4 OFFSET $5
+      LIMIT $5 OFFSET $6
       "#,
     )
     .bind(filter.user_id)
     .bind(filter.is_read)
+    .bind(filter.receiver.clone())
     .bind(filter.notification_type.clone())
     .bind(limit)
     .bind(offset)
@@ -118,11 +121,13 @@ impl NotificationRepository for SqlxNotificationRepository {
       SELECT COUNT(*) FROM users.notifications
       WHERE ($1::bigint IS NULL OR user_id = $1)
       AND ($2::boolean IS NULL OR is_read = $2)
-      AND ($3::text IS NULL OR type = $3)
+      AND ($3::text IS NULL OR receiver = $3)
+      AND ($4::text IS NULL OR notification_type = $4)
       "#,
     )
     .bind(filter.user_id)
     .bind(filter.is_read)
+    .bind(filter.receiver)
     .bind(filter.notification_type)
     .fetch_one(&self.db)
     .await
@@ -156,10 +161,6 @@ impl NotificationRepository for SqlxNotificationRepository {
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
-    if result.rows_affected() == 0 {
-      return Err(AppError::NotFound);
-    }
-
-    Ok(true)
+    Ok(result.rows_affected() > 0)
   }
 }

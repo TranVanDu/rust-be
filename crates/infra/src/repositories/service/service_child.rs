@@ -251,6 +251,7 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
     let services = sqlx::query_as::<_, ServiceChild>(
       r#"
     SELECT * FROM users.service_items
+    ORDER BY is_signature DESC, id ASC
     "#,
     )
     .fetch_all(&self.db)

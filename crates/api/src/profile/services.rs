@@ -56,7 +56,8 @@ pub async fn logout_user_service(
 ) -> AppResult<Json<bool>> {
   let profile_repo = SqlxProfileRepository { db: state.db.clone() };
 
-  let is_success = ProfileUseCase::logout_user(&profile_repo, user, req.refresh_token).await?;
+  let is_success =
+    ProfileUseCase::logout_user(&profile_repo, user, req.refresh_token, req.device_token).await?;
 
   Ok(Json(is_success))
 }

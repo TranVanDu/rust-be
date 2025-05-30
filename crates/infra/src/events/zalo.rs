@@ -8,6 +8,7 @@ use reqwest;
 use serde_json;
 use sqlx::PgPool;
 
+#[derive(Debug)]
 pub struct ZaloService {
   client: reqwest::Client,
   app_id: String,
@@ -17,6 +18,13 @@ pub struct ZaloService {
 
 impl ZaloService {
   pub fn new() -> Self {
+    tracing::info!("ZaloService create new servive");
+    let app_id = var("ZALO_APP_ID").unwrap_or_else(|_| "".to_string());
+    tracing::info!("Get env: {:#?}", app_id);
+    let grant_type = "refresh_token".to_string();
+    tracing::info!("Get env: {:#?}", grant_type);
+    let secret_key = var("ZALO_APP_SECRET_KEY").unwrap_or_else(|_| "".to_string());
+    tracing::info!("Get env: {:#?}", secret_key);
     Self {
       client: reqwest::Client::new(),
       app_id: var("ZALO_APP_ID").unwrap_or_else(|_| "".to_string()),
@@ -32,7 +40,7 @@ impl ZaloService {
     let token = sqlx::query_as::<_, ZaloToken>("SELECT * FROM users.zalo_tokens WHERE 1 = 1")
       .fetch_one(db)
       .await?;
-
+    tracing::info!("token: {:#?} {}", token, token.expires_at);
     if token.expires_at < Utc::now() {
       return ZaloService::refresh_token_zalo(&self, db, token).await;
     }

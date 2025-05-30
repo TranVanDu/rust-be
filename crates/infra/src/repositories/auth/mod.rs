@@ -423,14 +423,30 @@ pub async fn logout_user(
 ) -> AppResult<bool> {
   let user_id = user.pk_user_id;
 
+  let db = state.db.clone();
+
   if let Some(refresh_token) = req.refresh_token {
     if !refresh_token.is_empty() {
       tokio::spawn(async move {
         tokio::time::sleep(std::time::Duration::from_secs(3)).await;
         sqlx::query(r#"DELETE FROM users.refresh_tokens WHERE token = $1 and user_id = $2"#)
           .bind(refresh_token)
-          .bind(user_id)
+          .bind(&user_id)
           .execute(&state.db)
+          .await
+          .unwrap();
+      });
+    }
+  }
+
+  if let Some(token) = req.device_token {
+    if !token.is_empty() {
+      tokio::spawn(async move {
+        tokio::time::sleep(std::time::Duration::from_secs(3)).await;
+        sqlx::query(r#"DELETE FROM users.notification_tokens WHERE token = $1 and user_id = $2"#)
+          .bind(token)
+          .bind(user_id)
+          .execute(&db)
           .await
           .unwrap();
       });

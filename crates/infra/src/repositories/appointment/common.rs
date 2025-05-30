@@ -1,15 +1,12 @@
-use crate::firebase::NotificationService;
 use core_app::{AppResult, errors::AppError};
+use domain::entities::appointment::AppointmentService;
 use domain::entities::appointment::{AppointmentFilter, AppointmentWithServices};
 use domain::entities::common::PaginationMetadata;
-use domain::entities::notification::CreateNotification;
-use domain::entities::user::UserWithPassword;
-use domain::entities::{appointment::AppointmentService, service_child::ServiceChild};
-use domain::repositories::noti_token_repository::NotificationTokenRepository;
-use domain::repositories::notification_repository::NotificationRepository;
+use domain::entities::service_child::ServiceChild;
 use modql::filter::{ListOptions, OrderBy};
 use sqlx::PgPool;
-use std::sync::Arc;
+
+pub use crate::repositories::appointment::send_noti::*;
 
 pub async fn check_exit_service(
   db: &PgPool,
@@ -50,6 +47,7 @@ pub async fn count_appointment_by_user_id_and_status(
 
   Ok(res)
 }
+
 pub async fn insert_appointment_service<'e>(
   db: impl sqlx::Executor<'e, Database = sqlx::Postgres>,
   appointment_id: i64,
@@ -92,233 +90,6 @@ pub async fn check_appointment_service(
   .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
   Ok(res)
-}
-
-pub async fn get_token_reception(db: &PgPool) -> AppResult<Vec<String>> {
-  let tokens = sqlx::query_scalar::<_, String>(
-    r#"
-      SELECT token FROM users.notification_tokens a 
-      INNER JOIN users.tbl_users b ON a.user_id = b.pk_user_id 
-      WHERE b.role = 'RECEPTIONIST'
-    "#,
-  )
-  .fetch_all(db)
-  .await
-  .map_err(|err| AppError::BadRequest(err.to_string()))?;
-  Ok(tokens)
-}
-
-pub async fn get_token_technician(db: &PgPool) -> AppResult<Vec<String>> {
-  let tokens = sqlx::query_scalar::<_, String>(
-    r#"
-      SELECT token FROM users.notification_tokens a 
-      INNER JOIN users.tbl_users b ON a.user_id = b.pk_user_id 
-      WHERE b.role = 'TECHNICIAN'
-    "#,
-  )
-  .fetch_all(db)
-  .await
-  .map_err(|err| AppError::BadRequest(err.to_string()))?;
-  Ok(tokens)
-}
-
-pub async fn create_notification(
-  db: &PgPool,
-  notification_repo: Arc<dyn NotificationRepository>,
-  noti_token_repo: Arc<dyn NotificationTokenRepository>,
-  user_id: i64,
-  title: String,
-  body: String,
-  notification_type: String,
-  appointment_id: Option<i64>,
-  data: Option<serde_json::Value>,
-) -> AppResult<()> {
-  tracing::info!("Starting notification creation for user_id: {}", user_id);
-  let notification = CreateNotification {
-    user_id,
-    title,
-    body,
-    data,
-    notification_type: notification_type.clone(),
-    appointment_id,
-  };
-  let noti = notification_repo.create(notification).await?;
-  tracing::info!("Notification created successfully: {:#?}", noti);
-
-  let mut tokens = vec![];
-
-  if notification_type == "ALL_RECEPTIONIST" {
-    tokens = get_token_reception(db).await?;
-  } else if notification_type == "ALL_TECHNICIAN" {
-    tokens = get_token_technician(db).await?;
-  } else if notification_type == "ALL" {
-  } else {
-    let t = noti_token_repo.get_token_by_user_id(user_id).await?;
-    if t.is_empty() {
-      tracing::info!("No tokens found for user_id: {}, skipping notification send", user_id);
-      return Ok(());
-    }
-    tokens = t.iter().map(|item| item.token.clone()).collect();
-  }
-
-  if tokens.is_empty() {
-    return Ok(());
-  }
-
-  let notification_service = NotificationService::new().await.map_err(|err| {
-    tracing::error!("Failed to initialize notification service: {:?}", err);
-    AppError::BadRequest(err.to_string())
-  })?;
-
-  let success = notification_service.send_notification(noti, tokens).await;
-  tracing::info!("Firebase notification send result: {:#?}", success);
-  Ok(())
-}
-
-pub async fn send_noti_update(
-  db: &PgPool,
-  notification_repo: Arc<dyn NotificationRepository>,
-  noti_token_repo: Arc<dyn NotificationTokenRepository>,
-  user: UserWithPassword,
-  res: AppointmentWithServices,
-) -> AppResult<()> {
-  tracing::info!("Sending notification for user: {:#?}", user);
-  let user_full_name = res.user.get("full_name").and_then(|v| v.as_str()).unwrap_or("").to_string();
-  let receptionist_id =
-    res.receptionist.as_ref().and_then(|r| r.get("id")).and_then(|v| v.as_i64()).unwrap_or(0);
-  let user_id = res.user.get("id").and_then(|v| v.as_i64()).unwrap_or(0);
-  let technician_id =
-    res.technician.as_ref().and_then(|r| r.get("id")).and_then(|v| v.as_i64()).unwrap_or(0);
-
-  tracing::info!("Receptionist ID: {}", receptionist_id);
-  tracing::info!("User ID: {}", user_id);
-  tracing::info!("Technician ID: {}", technician_id);
-
-  if user.role == "CUSTOMER" {
-    if receptionist_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        receptionist_id.clone(),
-        "Cập nhật lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui lòng vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-
-    if technician_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        technician_id,
-        "Xác nhận lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui lòng vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-
-    return Ok(());
-  }
-
-  if user.role == "TECHNICIAN" || user.role == "ADMIN" {
-    if receptionist_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        receptionist_id,
-        "Cập nhật lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui số vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-
-    if user_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        user_id.clone(),
-        "Cập nhật lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui số vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-
-    return Ok(());
-  }
-
-  if user.role == "RECEPTIONIST" || user.role == "ADMIN" {
-    if user_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        user_id.clone(),
-        "Cập nhật lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui số vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-
-    if technician_id > 0 {
-      let _ = create_notification(
-        &db,
-        notification_repo.clone(),
-        noti_token_repo.clone(),
-        technician_id.clone(),
-        "Cập nhật lịch hẹn".to_string(),
-        format!("Lịch hẹn của {} vừa được cập nhật! Vui số vào kiểm tra. ", user_full_name),
-        "USER_ID".to_string(),
-        Some(res.id),
-        Some(serde_json::json!({
-          "appointment_id": res.id,
-          "user_name": user_full_name,
-          "start_time": res.start_time,
-        })),
-      )
-      .await?;
-    }
-  }
-
-  Ok(())
 }
 
 pub async fn get_appointments(

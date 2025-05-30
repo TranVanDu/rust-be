@@ -5,8 +5,8 @@ use modql::filter::ListOptions;
 use crate::{
   entities::{
     appointment::{
-      Appointment, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest, Status,
-      UpdateAppointmentRequest,
+      Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
+      CreateAppointmentRequest, Status, UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
     user::UserWithPassword,
@@ -129,7 +129,7 @@ impl AppointmentUseCase {
   pub async fn get_appointment_by_user_id(
     appointment_repo: &dyn AppointmentRepository,
     user: UserWithPassword,
-  ) -> AppResult<Vec<Appointment>> {
+  ) -> AppResult<Vec<AppointmentExtra>> {
     appointment_repo.get_appointment_by_user_id(user).await
   }
 

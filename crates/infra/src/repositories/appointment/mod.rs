@@ -1,13 +1,12 @@
-use crate::repositories::appointment::common::create_notification;
+use super::notification_token::SqlxNotiTokenRepository;
 use crate::repositories::notification::SqlxNotificationRepository;
 use async_trait::async_trait;
-use common::send_noti_update;
 use core_app::{AppResult, errors::AppError};
 use domain::{
   entities::{
     appointment::{
-      Appointment, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
-      UpdateAppointmentRequest,
+      Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
+      CreateAppointmentRequest, UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
     user::UserWithPassword,
@@ -18,10 +17,9 @@ use modql::filter::ListOptions;
 use serde_json;
 use sqlx::PgPool;
 use std::sync::Arc;
-
-use super::notification_token::SqlxNotiTokenRepository;
-
 pub mod common;
+pub mod send_noti;
+pub use crate::repositories::appointment::send_noti::*;
 
 pub struct SqlxAppointmentRepository {
   pub db: PgPool,
@@ -50,7 +48,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
         .await?;
     if count_pending > 1 {
       return Err(AppError::BadRequest(
-        "Bạn không thể đăng kí quá 1 lịch hẹn cùng lúc! Hãy chờ NaSpa xác nhận".to_string(),
+        "Bạn không thể đăng kí quá 2 lịch hẹn cùng lúc! Hãy chờ NaSpa xác nhận".to_string(),
       ));
     }
 
@@ -58,8 +56,12 @@ impl AppointmentRepository for SqlxAppointmentRepository {
 
     let res = sqlx::query_as::<_, Appointment>(
       r#"
-        INSERT INTO users.appointments (user_id, receptionist_id, technician_id, updated_by, start_time, end_time, status, notes)
-        VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+        INSERT INTO users.appointments (
+          user_id, receptionist_id, technician_id, updated_by, 
+          start_time, end_time, status, notes,
+          surcharge, promotion
+        )
+        VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
         RETURNING *
       "#,
     )
@@ -71,6 +73,8 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     .bind(payload.end_time)
     .bind(payload.status)
     .bind(payload.notes)
+    .bind(payload.surcharge.unwrap_or(0))
+    .bind(payload.promotion.unwrap_or(0))
     .fetch_one(&mut *tx)
     .await
     .map_err(|err| AppError::Unhandled(Box::new(err)))?;
@@ -104,7 +108,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
         payload.user_id,
         "Lịch hẹn mới".to_string(),
         format!("{} vừa đặt lịch hẹn thành công! Vui lòng vào kiểm tra. ", user_full_name),
-        "ALL_RECEPTIONIST".to_string(),
+        "ALLRECEPTIONIST".to_string(),
         Some(res.id),
         Some(serde_json::json!({
           "appointment_id": res.id,
@@ -142,30 +146,46 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       }
     }
 
+    // Lấy thông tin cũ trước khi update
+    let old_appointment =
+      sqlx::query_as::<_, Appointment>(r#"SELECT * FROM users.appointments WHERE id = $1"#)
+        .bind(id)
+        .fetch_optional(&db)
+        .await?
+        .ok_or(AppError::NotFound)?;
+
     let mut tx = db.begin().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
 
     let res = sqlx::query_as::<_, Appointment>(
       r#"
-        UPDATE users.appointments 
-        SET 
+        UPDATE users.appointments
+        SET
           updated_by = $1,
           status = COALESCE($2, status),
           notes = COALESCE($3, notes),
           start_time = COALESCE($4, start_time),
           end_time = COALESCE($5, end_time),
           receptionist_id = COALESCE($6, receptionist_id),
-          technician_id = COALESCE($7, technician_id)
-        WHERE id = $8 
+          technician_id = COALESCE($7, technician_id),
+          surcharge = COALESCE($8, surcharge),
+          promotion = COALESCE($9, promotion),
+          completed_at = CASE
+            WHEN $2 = 'COMPLETED' AND status != 'COMPLETED' THEN CURRENT_TIMESTAMP
+            ELSE completed_at
+          END
+        WHERE id = $10
         RETURNING *
       "#,
     )
     .bind(updated_by)
     .bind(payload.status.clone())
     .bind(payload.notes)
-    .bind(payload.start_time)
+    .bind(payload.start_time.clone())
     .bind(payload.end_time)
     .bind(payload.receptionist_id)
     .bind(payload.technician_id)
+    .bind(payload.surcharge)
+    .bind(payload.promotion)
     .bind(id)
     .fetch_one(&mut *tx)
     .await
@@ -174,15 +194,15 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     if !services.is_empty() {
       sqlx::query(
         r#"
-        DELETE FROM users.appointments_services 
-        WHERE appointment_id = $1 
+        DELETE FROM users.appointments_services
+        WHERE appointment_id = $1
         AND service_id NOT IN (
             SELECT unnest($2::bigint[])
         )
         "#,
       )
       .bind(id)
-      .bind(&services) // Truyền cả mảng services vào
+      .bind(&services)
       .execute(&mut *tx)
       .await
       .map_err(|err| {
@@ -213,10 +233,52 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     let notification_token_repo = Arc::new(SqlxNotiTokenRepository { db: db.clone() });
     let res_clone = res.clone();
 
-    tokio::spawn(async move {
-      let _ =
-        send_noti_update(&db, notification_repo, notification_token_repo, user, res_clone).await;
-    });
+    // Kiểm tra các thay đổi quan trọng
+    let mut has_important_changes = false;
+
+    // Kiểm tra technician
+    if let Some(technician_id) = &payload.technician_id {
+      if Some(*technician_id) != old_appointment.technician_id {
+        has_important_changes = true;
+      }
+    }
+
+    // Kiểm tra thời gian
+    if let Some(start_time) = &payload.start_time {
+      if start_time != &old_appointment.start_time {
+        has_important_changes = true;
+      }
+    }
+
+    let p_satus = payload.status.clone();
+    if let Some(status) = &p_satus {
+      if status != &old_appointment.status {
+        has_important_changes = true;
+      }
+    }
+
+    if has_important_changes {
+      let mut send_status = None;
+      if let Some(new_status) = &payload.status {
+        if new_status != &old_appointment.status {
+          send_status = Some(new_status.clone());
+        }
+      }
+
+      tracing::info!("Starting notification creation for user_id: {}", user.pk_user_id);
+
+      tokio::spawn(async move {
+        let _ = send_noti_update(
+          &db,
+          notification_repo,
+          notification_token_repo,
+          user,
+          res_clone,
+          send_status,
+        )
+        .await;
+      });
+    }
 
     Ok(res)
   }
@@ -355,21 +417,32 @@ impl AppointmentRepository for SqlxAppointmentRepository {
   async fn get_appointment_by_user_id(
     &self,
     user: UserWithPassword,
-  ) -> AppResult<Vec<Appointment>> {
+  ) -> AppResult<Vec<AppointmentExtra>> {
     let count_confirm = common::count_appointment_by_user_id_and_status(
       &self.db,
       user.pk_user_id,
       "CONFIRMED".to_string(),
     )
     .await?;
+
     if count_confirm > 0 {
-      let res = sqlx::query_as::<_, Appointment>(
+      let res = sqlx::query_as::<_, AppointmentExtra>(
         r#"
-          SELECT * FROM users.appointments 
-          WHERE user_id = $1 
-          AND status = 'CONFIRMED' 
-          AND TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') > CURRENT_TIMESTAMP
-          ORDER BY TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') ASC
+          SELECT a.*, 
+                 json_agg(json_build_object(
+                   'id', s.id,
+                   'service_name', s.service_name,
+                   'service_name_en', s.service_name_en,
+                   'price', s.price
+                 )) as services
+          FROM users.appointments a
+          LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
+          LEFT JOIN users.service_items s ON aps.service_id = s.id
+          WHERE a.user_id = $1 
+          AND a.status = 'CONFIRMED' 
+          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
+          GROUP BY a.id
+          ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,
       )
       .bind(user.pk_user_id)
@@ -386,13 +459,23 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     .await?;
 
     if count_pending > 0 {
-      let res = sqlx::query_as::<_, Appointment>(
+      let res = sqlx::query_as::<_, AppointmentExtra>(
         r#"
-          SELECT * FROM users.appointments 
-          WHERE user_id = $1 
-          AND status = 'PENDING'
-          AND TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') > CURRENT_TIMESTAMP
-          ORDER BY TO_TIMESTAMP(start_time, 'HH24:MI DD/MM/YYYY') ASC
+          SELECT a.*, 
+                 json_agg(json_build_object(
+                   'id', s.id,
+                   'service_name', s.service_name,
+                   'service_name_en', s.service_name_en,
+                   'price', s.price
+                 )) as services
+          FROM users.appointments a
+          LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
+          LEFT JOIN users.service_items s ON aps.service_id = s.id
+          WHERE a.user_id = $1 
+          AND a.status = 'PENDING'
+          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
+          GROUP BY a.id
+          ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,
       )
       .bind(user.pk_user_id)

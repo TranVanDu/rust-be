@@ -21,4 +21,5 @@ pub fn routes() -> Router<Arc<AppState>> {
     .route("/services/{id}/child/{child_id}", get(service_child::get_service_child))
     .route("/services/{id}/child/{child_id}", delete(service_child::delete_service))
     .route("/services/{id}/child/{child_id}", patch(service_child::update_service))
+    .route("/services/list-all-with-children", get(services::get_all_services_with_children))
 }

@@ -16,8 +16,30 @@ pub struct Appointment {
   pub end_time: Option<String>,
   pub status: String,
   pub notes: Option<String>,
+  pub surcharge: i32,
+  pub promotion: i32,
+  pub completed_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
+}
+
+#[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
+pub struct AppointmentExtra {
+  pub id: i64,
+  pub user_id: i64,
+  pub receptionist_id: Option<i64>,
+  pub technician_id: Option<i64>,
+  pub updated_by: Option<i64>,
+  pub start_time: String,
+  pub end_time: Option<String>,
+  pub status: String,
+  pub notes: Option<String>,
+  pub surcharge: i32,
+  pub promotion: i32,
+  pub completed_at: Option<DateTime<Utc>>,
+  pub created_at: DateTime<Utc>,
+  pub updated_at: DateTime<Utc>,
+  pub services: serde_json::Value,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
@@ -30,6 +52,8 @@ pub struct CreateAppointmentRequest {
   pub end_time: Option<String>,
   pub status: Option<String>,
   pub notes: Option<String>,
+  pub surcharge: Option<i32>,
+  pub promotion: Option<i32>,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
@@ -41,6 +65,9 @@ pub struct UpdateAppointmentRequest {
   pub end_time: Option<String>,
   pub status: Option<String>,
   pub notes: Option<String>,
+  pub surcharge: Option<i64>,
+  pub promotion: Option<i64>,
+  pub completed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
@@ -57,6 +84,9 @@ pub struct AppointmentWithServices {
   pub updated_by: Option<i64>,
   pub services: serde_json::Value,
   pub user: serde_json::Value,
+  pub surcharge: i32,
+  pub promotion: i32,
+  pub completed_at: Option<DateTime<Utc>>,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]

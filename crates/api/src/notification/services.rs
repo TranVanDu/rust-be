@@ -209,6 +209,7 @@ pub async fn get_unread_count(
   let filter = NotificationFilter {
     user_id: Some(user.pk_user_id),
     is_read: Some(false),
+    receiver: None,
     notification_type: None,
   };
 

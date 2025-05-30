@@ -47,6 +47,8 @@ pub trait ServiceRepository: Send + Sync {
   ) -> AppResult<(Vec<Service>, PaginationMetadata)>;
 
   async fn get_all_services(&self) -> AppResult<Vec<Service>>;
+
+  async fn get_all_services_with_children(&self) -> AppResult<Vec<ServiceWithChild>>;
 }
 
 #[async_trait]

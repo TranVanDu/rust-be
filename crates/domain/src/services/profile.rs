@@ -35,8 +35,9 @@ impl ProfileUseCase {
     profile_repo: &dyn ProfileRepository,
     user: UserWithPassword,
     refresh_token: Option<String>,
+    device_token: Option<String>,
   ) -> AppResult<bool> {
-    profile_repo.logout_user(user, refresh_token).await
+    profile_repo.logout_user(user, refresh_token, device_token).await
   }
 
   pub async fn get_profile(

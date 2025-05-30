@@ -44,6 +44,12 @@ impl ServiceUseCase {
     service_repo.get_all_services().await
   }
 
+  pub async fn get_all_services_with_children(
+    service_repo: &dyn ServiceRepository
+  ) -> AppResult<Vec<ServiceWithChild>> {
+    service_repo.get_all_services_with_children().await
+  }
+
   pub async fn create(
     service_repo: &dyn ServiceRepository,
     image_service: Arc<dyn ImageRepository>,

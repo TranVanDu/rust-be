@@ -58,6 +58,8 @@ impl NotificationService {
         }
       }
 
+      tracing::info!("{:?}kdskjdhskjdhjksjdksjdkjskdjskdjksjd", message);
+
       let response = self
         .http_client
         .post(format!("https://fcm.googleapis.com/v1/projects/{}/messages:send", self.project_id))
@@ -92,10 +94,11 @@ impl NotificationService {
         "Your appointment has been confirmed for {}",
         appointment_time.format("%Y-%m-%d %H:%M")
       ),
-      notification_type: "appointment_confirmation".to_string(),
+      receiver: "USER".to_string(),
+      notification_type: "APPOINTMENT".to_string(),
       data: Some(serde_json::json!({
           "appointment_id": appointment_id,
-          "type": "appointment_confirmation"
+          "notification_type": "APPOINTMENT"
       })),
       is_read: false,
       created_at: chrono::Utc::now(),

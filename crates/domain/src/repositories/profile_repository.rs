@@ -19,6 +19,7 @@ pub trait ProfileRepository: Send + Sync {
     &self,
     user: UserWithPassword,
     refresh_token: Option<String>,
+    device_token: Option<String>,
   ) -> AppResult<bool>;
 
   async fn get_profile(

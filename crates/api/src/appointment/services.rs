@@ -6,10 +6,9 @@ use core_app::{AppResult, AppState};
 use domain::{
   entities::{
     appointment::{
-      Appointment, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
-      UpdateAppointmentRequest,
+       AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest, UpdateAppointmentRequest
     },
-    common::{GetPaginationList, PaginationMetadata, PaginationOptions},
+    common::{GetPaginationList, PaginationOptions},
     user::UserWithPassword,
   },
   services::appointment::AppointmentUseCase,
@@ -183,7 +182,7 @@ pub async fn get_appointments(
     path = "/api/v1/appointment/get-current",
     tag="Appointment Service",
     responses(
-        (status = 200, description = "Login successfully", body = Vec<Appointment>),
+        (status = 200, description = "Login successfully", body = Vec<AppointmentWithServices>),
         (status = 400, description = "Bad request", body = String),
         (status = 500, description = "Internal server error", body = String)
     )
@@ -191,7 +190,7 @@ pub async fn get_appointments(
 pub async fn get_appointment_current_user(
   State(state): State<Arc<AppState>>,
   Extension(user): Extension<UserWithPassword>,
-) -> AppResult<Json<Vec<Appointment>>> {
+) -> AppResult<Json<Vec<AppointmentExtra>>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
 
   let appointment = AppointmentUseCase::get_appointment_by_user_id(&appointment_repo, user).await?;

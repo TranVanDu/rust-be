@@ -19,7 +19,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
     // Get total revenue
     let total_revenue: i64 = sqlx::query_scalar(
       r#"
-            SELECT COALESCE(SUM(s.price), 0) as total_revenue
+            SELECT COALESCE(SUM(s.price + a.surcharge - a.promotion), 0) as total_revenue
             FROM users.appointments a
             JOIN users.appointments_services aps ON a.id = aps.appointment_id
             JOIN users.service_items s ON aps.service_id = s.id
@@ -79,7 +79,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
                 s.id as service_id,
                 s.service_name,
                 COUNT(*) as total_count,
-                SUM(s.price) as total_revenue
+                SUM(s.price + a.surcharge - a.promotion) as total_revenue
             FROM users.appointments a
             JOIN users.appointments_services aps ON a.id = aps.appointment_id
             JOIN users.service_items s ON aps.service_id = s.id
@@ -97,7 +97,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
                 t.pk_user_id as technician_id,
                 t.full_name as technician_name,
                 COUNT(DISTINCT a.id) as total_appointments,
-                SUM(s.price) as total_revenue
+                SUM(s.price + a.surcharge - a.promotion) as total_revenue
             FROM users.appointments a
             JOIN users.appointments_services aps ON a.id = aps.appointment_id
             JOIN users.service_items s ON aps.service_id = s.id
@@ -115,7 +115,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
             SELECT 
                 TO_CHAR(TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY'), 'YYYY-MM-DD') as date,
                 COUNT(*) as total_appointments,
-                SUM(s.price) as total_revenue
+                SUM(s.price + a.surcharge - a.promotion) as total_revenue
             FROM users.appointments a
             JOIN users.appointments_services aps ON a.id = aps.appointment_id
             JOIN users.service_items s ON aps.service_id = s.id
@@ -380,7 +380,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
     // Get total revenue
     let total_revenue: i64 = sqlx::query_scalar(
       r#"
-      SELECT COALESCE(SUM(s.price), 0)
+      SELECT COALESCE(SUM(s.price + a.surcharge - a.promotion), 0)
       FROM users.appointments a
       JOIN users.appointments_services aps ON a.id = aps.appointment_id
       JOIN users.service_items s ON aps.service_id = s.id
@@ -398,7 +398,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
           s.id as service_id,
           s.service_name,
           COUNT(*) as total_count,
-          SUM(s.price) as total_revenue
+          SUM(s.price + a.surcharge - a.promotion) as total_revenue
       FROM users.appointments a
       JOIN users.appointments_services aps ON a.id = aps.appointment_id
       JOIN users.service_items s ON aps.service_id = s.id
@@ -417,7 +417,7 @@ impl StatisticsRepository for SqlxStatisticsRepository {
       SELECT 
           TO_CHAR(TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY'), 'YYYY-MM-DD') as date,
           COUNT(*) as total_appointments,
-          SUM(s.price) as total_revenue
+          SUM(s.price + a.surcharge - a.promotion) as total_revenue
       FROM users.appointments a
       JOIN users.appointments_services aps ON a.id = aps.appointment_id
       JOIN users.service_items s ON aps.service_id = s.id

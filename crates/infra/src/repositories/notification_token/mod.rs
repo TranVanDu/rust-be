@@ -17,7 +17,7 @@ impl NotificationTokenRepository for SqlxNotiTokenRepository {
     payload: PayloadNotificationToken,
   ) -> AppResult<NotificationToken> {
     // Check if token already exists
-    let existing_token = sqlx::query_as::<_, NotificationToken>(
+    let existing_token: Option<NotificationToken> = sqlx::query_as::<_, NotificationToken>(
       r#"
       SELECT *
       FROM "users"."notification_tokens"
@@ -36,6 +36,18 @@ impl NotificationTokenRepository for SqlxNotiTokenRepository {
       return Ok(token);
     }
 
+    let record = sqlx::query_as::<_, NotificationToken>(
+      r#"
+      SELECT *
+      FROM "users"."notification_tokens"
+      WHERE platform = $1 AND token = $2
+      "#,
+    )
+    .bind(&payload.platform)
+    .bind(&payload.token)
+    .fetch_optional(&self.db)
+    .await?;
+
     // Create new token if not exists
     let token = sqlx::query_as::<_, NotificationToken>(
       r#"
@@ -50,6 +62,18 @@ impl NotificationTokenRepository for SqlxNotiTokenRepository {
     .fetch_one(&self.db)
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    if let Some(token_old) = record {
+      let _ = sqlx::query(
+        r#"
+        DELETE FROM "users"."notification_tokens"
+        WHERE id = $4
+        "#,
+      )
+      .bind(token_old.id)
+      .execute(&self.db)
+      .await?;
+    }
 
     Ok(token)
   }

@@ -128,4 +128,5 @@ pub struct VerifyFireCodeRequest {
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema)]
 pub struct LogoutRequest {
   pub refresh_token: Option<String>,
+  pub device_token: Option<String>,
 }

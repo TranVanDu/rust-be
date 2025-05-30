@@ -174,7 +174,7 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
   let noti_service =
     NotificationService::new().await.map_err(|err| AppError::BadRequest(err.to_string()))?;
   let noti_token_repo = SqlxNotiTokenRepository { db: state.db.clone() };
-  let tokens = NotificationTokenUseCase::get_token_by_user_id(&noti_token_repo, 9).await?;
+  let tokens = NotificationTokenUseCase::get_token_by_user_id(&noti_token_repo, 2).await?;
 
   if tokens.is_empty() {
     return Err(AppError::NotFound);
@@ -190,6 +190,7 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
         user_id: 0,
         title: "test".to_string(),
         body: "test".to_string(),
+        receiver: "USER".to_string(),
         notification_type: "test".to_string(),
         data: None,
         appointment_id: None,
@@ -206,7 +207,9 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
 }
 
 pub async fn test_zalo(State(state): State<Arc<AppState>>) -> AppResult<Json<()>> {
+  tracing::info!("start test zalo");
   let zalo_service = ZaloService::new();
+  tracing::info!("zalo_service: {:#?}", zalo_service);
   let templates = ZaloService::send_message_otp(&zalo_service, &state.db, "+84961483800", "636363")
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;

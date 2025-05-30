@@ -270,6 +270,7 @@ impl ServiceRepository for SqlxServiceRepository {
     let services = sqlx::query_as::<_, Service>(
       r#"
     SELECT * FROM users.services
+    ORDER BY is_signature DESC, id ASC
     "#,
     )
     .fetch_all(&self.db)
@@ -277,5 +278,55 @@ impl ServiceRepository for SqlxServiceRepository {
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
     Ok(services)
+  }
+
+  async fn get_all_services_with_children(&self) -> AppResult<Vec<ServiceWithChild>> {
+    let services = sqlx::query_as::<_, Service>(
+      r#"
+      SELECT * FROM users.services
+      ORDER BY is_signature DESC, id ASC
+      "#,
+    )
+    .fetch_all(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    let mut services_with_children = Vec::new();
+
+    for service in services {
+      let child_services = sqlx::query_as::<_, ServiceChild>(
+        r#"
+        SELECT * FROM users.service_items 
+        WHERE parent_service_id = $1
+        ORDER BY is_signature DESC, id ASC
+        "#,
+      )
+      .bind(service.id)
+      .fetch_all(&self.db)
+      .await
+      .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+      let service_with_child = ServiceWithChild {
+        id: service.id,
+        service_name: service.service_name,
+        service_name_en: service.service_name_en,
+        service_name_ko: service.service_name_ko,
+        description_ko: service.description_ko,
+        description_en: service.description_en,
+        description: service.description,
+        price: service.price,
+        image: service.image,
+        is_active: service.is_active,
+        is_signature: service.is_signature,
+        service_type: service.service_type,
+        created_at: service.created_at,
+        updated_at: service.updated_at,
+        child: child_services,
+      };
+
+      services_with_children.push(service_with_child);
+    }
+
+    Ok(services_with_children)
   }
 }
