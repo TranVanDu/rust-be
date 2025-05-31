@@ -1,5 +1,6 @@
 use crate::entities::user::{
-  RequestCreateUser, RequestUpdateUser, User, UserFilter, UserFilterConvert, UserWithPassword,
+  PhoneFilterConvert, RequestCreateUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+  UserWithPassword,
 };
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
@@ -131,4 +132,15 @@ pub trait UserRepository: Send + Sync {
     &self,
     user: UserWithPassword,
   ) -> AppResult<Vec<User>>;
+
+  async fn create(
+    &self,
+    user: UserWithPassword,
+    data: RequestCreateUser,
+  ) -> AppResult<UserWithPassword>;
+
+  async fn get_user_by_phone(
+    &self,
+    filter: PhoneFilterConvert,
+  ) -> AppResult<UserWithPassword>;
 }

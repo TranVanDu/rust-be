@@ -15,5 +15,9 @@ pub fn routes() -> Router<Arc<AppState>> {
     .route("/appointments/user/{id}", get(services::get_appointment_by_user_id))
     .route("/appointments", get(services::get_appointments))
     .route("/appointments/get-current", get(services::get_appointment_current_user))
-    .route("/appointments-by-technician", get(services::get_appointment_current_user))
+    .route("/appointments-by-technician", get(services::get_appointment_by_technician))
+    .route(
+      "/appointments/create-for-new-customer",
+      post(services::create_appointment_for_new_customer_api),
+    )
 }

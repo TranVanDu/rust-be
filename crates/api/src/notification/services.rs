@@ -2,7 +2,7 @@ use axum::Extension;
 use axum::extract::{Path, Query};
 use axum::{Json, extract::State};
 use core_app::{AppResult, AppState};
-use domain::entities::common::PaginationOptions;
+use domain::entities::common::{PaginationMetadata, PaginationOptions};
 use domain::entities::notification::{
   CreateNotification, Notification, NotificationFilter, UpdateNotification,
 };
@@ -175,17 +175,30 @@ pub async fn get_user_notifications(
   };
   let repo = SqlxNotificationRepository { db: state.db.clone() };
 
-  // Get user_id from auth context
-  let user_id = user.pk_user_id;
-  let mut filter = filter;
-  filter.user_id = Some(user_id);
-
-  let (notifications, pagination) =
-    NotificationUseCase::list(&repo, filter, Some(list_options)).await?;
+  let (notifications, pagination) = match user.role.as_str() {
+    "RECEPTIONIST" | "TECHNICIAN" => {
+      let mut user_filter = filter.clone();
+      user_filter.user_id = Some(user.pk_user_id);
+      user_filter.receiver = Some(user.role.clone());
+      NotificationUseCase::list(&repo, user_filter, Some(list_options)).await?
+    },
+    "CUSTOMER" => {
+      let mut user_filter = filter.clone();
+      user_filter.user_id = Some(user.pk_user_id);
+      user_filter.receiver = Some("USER".to_string());
+      NotificationUseCase::list(&repo, user_filter, Some(list_options)).await?
+    },
+    _ => (vec![], PaginationMetadata {
+      total_items: 0,
+      total_pages: 0,
+      current_page: 1,
+      per_page: list_options.limit.unwrap_or(10) as u64,
+    }),
+  };
 
   let response = json!({
-      "data": notifications,
-      "metadata": pagination
+    "data": notifications,
+    "metadata": pagination
   });
 
   Ok(Json(response))
@@ -206,17 +219,60 @@ pub async fn get_unread_count(
   Extension(user): Extension<UserWithPassword>,
 ) -> AppResult<Json<Value>> {
   let repo = SqlxNotificationRepository { db: state.db.clone() };
-  let filter = NotificationFilter {
-    user_id: Some(user.pk_user_id),
-    is_read: Some(false),
-    receiver: None,
-    notification_type: None,
+  let count = match user.role.as_str() {
+    "RECEPTIONIST" => {
+      get_role_notifications_count(&repo, user.pk_user_id, "RECEPTIONIST", "ALLRECEPTIONIST")
+        .await?
+    },
+    "TECHNICIAN" => {
+      get_role_notifications_count(&repo, user.pk_user_id, "TECHNICIAN", "ALLTECHNICIAN").await?
+    },
+    "CUSTOMER" => get_user_notifications_count(&repo, user.pk_user_id).await?,
+    _ => 0,
   };
-
-  let (notifications, _) = NotificationUseCase::list(&repo, filter, None).await?;
-  let count = notifications.len();
 
   Ok(Json(json!({
     "count": count
   })))
+}
+
+async fn get_role_notifications_count(
+  repo: &SqlxNotificationRepository,
+  user_id: i64,
+  specific_receiver: &str,
+  all_receiver: &str,
+) -> AppResult<i64> {
+  // Get notifications specifically for this user
+  let filter_specific = NotificationFilter {
+    user_id: Some(user_id),
+    is_read: Some(false),
+    receiver: Some(specific_receiver.to_string()),
+    notification_type: None,
+  };
+  let (notifications_specific, _) = NotificationUseCase::list(repo, filter_specific, None).await?;
+
+  // Get notifications for all users of this role
+  let filter_all = NotificationFilter {
+    user_id: None,
+    is_read: Some(false),
+    receiver: Some(all_receiver.to_string()),
+    notification_type: None,
+  };
+  let (notifications_all, _) = NotificationUseCase::list(repo, filter_all, None).await?;
+
+  Ok(notifications_specific.len() as i64 + notifications_all.len() as i64)
+}
+
+async fn get_user_notifications_count(
+  repo: &SqlxNotificationRepository,
+  user_id: i64,
+) -> AppResult<i64> {
+  let filter = NotificationFilter {
+    user_id: Some(user_id),
+    is_read: Some(false),
+    receiver: Some("USER".to_string()),
+    notification_type: None,
+  };
+  let (notifications, _) = NotificationUseCase::list(repo, filter, None).await?;
+  Ok(notifications.len() as i64)
 }

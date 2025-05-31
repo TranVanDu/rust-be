@@ -187,7 +187,7 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
     .send_notification(
       Notification {
         id: 0,
-        user_id: 0,
+        user_id: Some(0),
         title: "test".to_string(),
         body: "test".to_string(),
         receiver: "USER".to_string(),
@@ -209,7 +209,6 @@ pub async fn test(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Stri
 pub async fn test_zalo(State(state): State<Arc<AppState>>) -> AppResult<Json<()>> {
   tracing::info!("start test zalo");
   let zalo_service = ZaloService::new();
-  tracing::info!("zalo_service: {:#?}", zalo_service);
   let templates = ZaloService::send_message_otp(&zalo_service, &state.db, "+84961483800", "636363")
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;

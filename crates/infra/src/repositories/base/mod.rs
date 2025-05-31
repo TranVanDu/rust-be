@@ -323,7 +323,7 @@ pub fn compute_list_options<DMC>(
   Ok((list_options, page as u64))
 }
 
-pub fn generateListoption(list_options: PaginationOptions) -> ListOptions {
+pub fn generate_listoption(list_options: PaginationOptions) -> ListOptions {
   let list_options = ListOptions {
     limit: list_options.per_page.map(|limit| limit as i64),
     offset: list_options.page.map(|page| {

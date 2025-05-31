@@ -139,7 +139,7 @@ USER appuser
 # Set environment variables
 ENV ENV=production
 ENV RUST_LOG=info
-ENV RUST_BACKTRACE=0
+ENV RUST_BACKTRACE=1
 ENV TZ=UTC
 
 # Expose port and set healthcheck

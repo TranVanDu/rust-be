@@ -29,7 +29,7 @@ macro_rules! gen_com_fn {
       update as repo_update,
       delete as repo_delete,
       delete_many as repo_delete_many,
-      generateListoption
+      generate_listoption
     };
 
     $(
@@ -151,7 +151,7 @@ macro_rules! gen_com_fn {
         Query(list_options): Query<PaginationOptions>,
         State(state): State<Arc<AppState>>,
       ) -> AppResult<Json<Value>> {
-        let list_options = generateListoption(list_options);
+        let list_options = generate_listoption(list_options);
 
         // Preprocess filter
         let filter = query.pre_process_r().await?;

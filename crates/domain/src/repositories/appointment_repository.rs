@@ -4,8 +4,8 @@ use modql::filter::ListOptions;
 
 use crate::entities::{
   appointment::{
-    Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
-    CreateAppointmentRequest, UpdateAppointmentRequest,
+    AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
+    UpdateAppointmentRequest,
   },
   common::PaginationMetadata,
   user::UserWithPassword,
@@ -17,6 +17,7 @@ pub trait AppointmentRepository: Send + Sync {
     &self,
     user: UserWithPassword,
     appointment: CreateAppointmentRequest,
+    create_by_role: String,
   ) -> AppResult<AppointmentWithServices>;
 
   async fn update_appointment(
