@@ -1,17 +1,18 @@
 use chrono::{FixedOffset, NaiveDateTime, TimeZone, Utc};
 use core_app::{AppResult, errors::AppError};
-use modql::filter::ListOptions;
+use modql::filter::{ListOptions, OpValsString};
 
 use crate::{
   entities::{
     appointment::{
-      Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
-      CreateAppointmentRequest, Status, UpdateAppointmentRequest,
+      AppointmentExtra, AppointmentFilter, AppointmentWithServices,
+      CreateAppointmentForNewCustomerRequest, CreateAppointmentRequest, Status,
+      UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
-    user::UserWithPassword,
+    user::{PhoneFilterConvert, RequestCreateUser, Role, UserWithPassword},
   },
-  repositories::appointment_repository::AppointmentRepository,
+  repositories::{appointment_repository::AppointmentRepository, user_repository::UserRepository},
 };
 
 fn validate_appointment_time(start_time_str: &str) -> Result<(), AppError> {
@@ -59,7 +60,11 @@ impl AppointmentUseCase {
 
     validate_appointment_time(&appointment.start_time)?;
 
-    appointment_repo.create_appointment(user, appointment).await
+    // Create appointment
+    let created_appointment =
+      appointment_repo.create_appointment(user.clone(), appointment, user.role).await?;
+
+    Ok(created_appointment)
   }
 
   pub async fn update_appointment(
@@ -90,7 +95,11 @@ impl AppointmentUseCase {
       validate_appointment_time(&appointment.start_time.as_ref().unwrap())?;
     }
 
-    appointment_repo.update_appointment(user, id, appointment).await
+    // Update appointment
+    let updated_appointment =
+      appointment_repo.update_appointment(user.clone(), id, appointment.clone()).await?;
+
+    Ok(updated_appointment)
   }
 
   pub async fn get_appointments(
@@ -140,5 +149,72 @@ impl AppointmentUseCase {
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<AppointmentWithServices>, PaginationMetadata)> {
     appointment_repo.get_appointment_by_technician(user, filter, list_options).await
+  }
+
+  pub async fn create_appointment_for_new_customer(
+    appointment_repo: &dyn AppointmentRepository,
+    user_repo: &dyn UserRepository,
+    user: UserWithPassword,
+    payload: CreateAppointmentForNewCustomerRequest,
+  ) -> AppResult<AppointmentWithServices> {
+    let user_payload = RequestCreateUser {
+      user_name: None,
+      password_hash: None,
+      role: Role::CUSTOMER,
+      email_address: payload.email_address,
+      full_name: Some(payload.full_name),
+      phone: Some(payload.phone.clone()),
+      is_active: Some(true),
+      is_verify: Some(false),
+      date_of_birth: payload.date_of_birth,
+      address: None,
+    };
+
+    // Check if phone number already exists
+    let exist_user = user_repo
+      .get_user_by_phone(PhoneFilterConvert {
+        phone: Some(OpValsString::from(payload.phone.clone())),
+      })
+      .await
+      .unwrap_or_else(|_| UserWithPassword {
+        pk_user_id: 0,
+        user_name: None,
+        role: "".to_string(),
+        email_address: None,
+        full_name: None,
+        phone: None,
+        is_active: false,
+        is_verify: false,
+        password_hash: None,
+        date_of_birth: None,
+        address: None,
+        avatar: None,
+      });
+
+    let new_user;
+
+    if exist_user.pk_user_id > 0 {
+      new_user = exist_user;
+    } else {
+      new_user = user_repo.create(user.clone(), user_payload).await?;
+    }
+
+    let appointment_payload = CreateAppointmentRequest {
+      services: payload.services,
+      user_id: new_user.pk_user_id,
+      receptionist_id: Some(user.pk_user_id),
+      technician_id: payload.technician_id,
+      start_time: payload.start_time,
+      end_time: payload.end_time,
+      status: Some(Status::CONFIRMED.to_string()),
+      notes: payload.notes,
+      surcharge: payload.surcharge,
+      promotion: payload.promotion,
+      price: None,
+    };
+    let created_appointment =
+      appointment_repo.create_appointment(new_user, appointment_payload, user.role).await?;
+
+    Ok(created_appointment)
   }
 }

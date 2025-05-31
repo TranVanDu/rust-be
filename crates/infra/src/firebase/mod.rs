@@ -87,7 +87,7 @@ impl NotificationService {
   ) -> Result<bool> {
     let notification = Notification {
       id: 1,
-      user_id,
+      user_id: Some(user_id),
       appointment_id: None,
       title: "Appointment Confirmed".to_string(),
       body: format!(

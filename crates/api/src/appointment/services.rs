@@ -6,14 +6,17 @@ use core_app::{AppResult, AppState};
 use domain::{
   entities::{
     appointment::{
-       AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest, UpdateAppointmentRequest
+      AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest, UpdateAppointmentRequest, CreateAppointmentForNewCustomerRequest
     },
     common::{GetPaginationList, PaginationOptions},
     user::UserWithPassword,
   },
   services::appointment::AppointmentUseCase,
 };
-use infra::repositories::appointment::SqlxAppointmentRepository;
+use infra::repositories::{
+  appointment::SqlxAppointmentRepository,
+  user::SqlxUserRepository,
+};
 use modql::filter::{ListOptions, OrderBys};
 use serde_json::{Value, json};
 use std::sync::Arc;
@@ -35,6 +38,7 @@ pub async fn create_appointment(
   Json(req): Json<CreateAppointmentRequest>,
 ) -> AppResult<Json<AppointmentWithServices>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+
 
   let appointment = AppointmentUseCase::create_appointment(&appointment_repo, user, req).await?;
 
@@ -60,8 +64,7 @@ pub async fn update_appointment(
 ) -> AppResult<Json<AppointmentWithServices>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
 
-  let appointment =
-    AppointmentUseCase::update_appointment(&appointment_repo, id, user, req).await?;
+  let appointment = AppointmentUseCase::update_appointment(&appointment_repo, id, user, req).await?;
 
   Ok(Json(appointment))
 }
@@ -127,9 +130,9 @@ pub async fn delete_appointment(
 ) -> AppResult<Json<bool>> {
   let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
 
-  let sucecss = AppointmentUseCase::delete_appointment(&appointment_repo, user, id).await?;
+  let success = AppointmentUseCase::delete_appointment(&appointment_repo, user, id).await?;
 
-  Ok(Json(sucecss))
+  Ok(Json(success))
 }
 
 #[utoipa::path(
@@ -237,6 +240,35 @@ pub async fn get_appointment_by_technician(
       "metadata": pagination
   });
   Ok(Json(response))
+}
+
+#[utoipa::path(
+    post,
+    path = "/api/v1/appointments/create-for-new-customer",
+    tag="Appointment Service",
+    request_body = CreateAppointmentForNewCustomerRequest,
+    responses(
+        (status = 200, description = "Create appointment for new customer successfully", body = AppointmentWithServices),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn create_appointment_for_new_customer_api(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+  Json(payload): Json<CreateAppointmentForNewCustomerRequest>,
+) -> AppResult<Json<AppointmentWithServices>> {
+  let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+  let user_repo = SqlxUserRepository { db: state.db.clone() }; // Need UserRepo here too
+
+  let created_appointment = AppointmentUseCase::create_appointment_for_new_customer(
+    &appointment_repo,
+    &user_repo,
+    user,
+    payload,
+  ).await?;
+
+  Ok(Json(created_appointment))
 }
 
 

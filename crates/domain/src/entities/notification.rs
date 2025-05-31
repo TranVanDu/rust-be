@@ -7,7 +7,7 @@ use utoipa::{IntoParams, ToSchema};
 #[derive(Debug, Serialize, Deserialize, FromRow, Clone, ToSchema)]
 pub struct Notification {
   pub id: i64,
-  pub user_id: i64,
+  pub user_id: Option<i64>,
   pub title: String,
   pub body: String,
   pub receiver: String,
@@ -21,7 +21,7 @@ pub struct Notification {
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
 pub struct CreateNotification {
-  pub user_id: i64,
+  pub user_id: Option<i64>,
   pub title: String,
   pub body: String,
   pub receiver: String,

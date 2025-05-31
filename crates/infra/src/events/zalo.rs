@@ -10,7 +10,6 @@ use sqlx::PgPool;
 
 #[derive(Debug)]
 pub struct ZaloService {
-  client: reqwest::Client,
   app_id: String,
   grant_type: String,
   secret_key: String,
@@ -19,18 +18,13 @@ pub struct ZaloService {
 impl ZaloService {
   pub fn new() -> Self {
     tracing::info!("ZaloService create new servive");
-    let app_id = var("ZALO_APP_ID").unwrap_or_else(|_| "".to_string());
-    tracing::info!("Get env: {:#?}", app_id);
+    let app_id = var("ZALO_APP_ID").expect("ZALO_APP_ID must be set");
+    tracing::info!("Get env: {}", app_id);
     let grant_type = "refresh_token".to_string();
-    tracing::info!("Get env: {:#?}", grant_type);
-    let secret_key = var("ZALO_APP_SECRET_KEY").unwrap_or_else(|_| "".to_string());
-    tracing::info!("Get env: {:#?}", secret_key);
-    Self {
-      client: reqwest::Client::new(),
-      app_id: var("ZALO_APP_ID").unwrap_or_else(|_| "".to_string()),
-      grant_type: "refresh_token".to_string(),
-      secret_key: var("ZALO_APP_SECRET_KEY").unwrap_or_else(|_| "".to_string()),
-    }
+    tracing::info!("Get env: {}", grant_type);
+    let secret_key = var("ZALO_APP_SECRET_KEY").expect("ZALO_APP_SECRET_KEY must be set");
+    tracing::info!("Get env: {}", secret_key);
+    Self { app_id, grant_type, secret_key }
   }
 
   pub async fn get_zalo_token(
@@ -53,8 +47,7 @@ impl ZaloService {
     db: &PgPool,
     token: ZaloToken,
   ) -> Result<ZaloToken, anyhow::Error> {
-    let response = self
-      .client
+    let response = reqwest::Client::new()
       .post("https://oauth.zaloapp.com/v4/oa/access_token")
       .header("secret_key", &self.secret_key)
       .form(&[
@@ -114,8 +107,7 @@ impl ZaloService {
     db: &PgPool,
     token: ZaloToken,
   ) -> Result<Vec<ZaloTemplate>, anyhow::Error> {
-    let response = self
-      .client
+    let response = reqwest::Client::new()
       .get(format!("https://business.openapi.zalo.me/template/all?offset=0&limit=10&status=1"))
       .header("access_token", &token.access_token)
       .send()
@@ -162,13 +154,21 @@ impl ZaloService {
     phone: &str,
     otp: &str,
   ) -> Result<(), anyhow::Error> {
-    let token: ZaloToken = ZaloService::get_zalo_token(self, db)
-      .await
-      .map_err(|err| AppError::BadRequest(err.to_string()))?;
+    let token: ZaloToken = ZaloService::get_zalo_token(self, db).await.map_err(|err| {
+      tracing::error!("Failed to get Zalo token: {}", err);
+      anyhow::anyhow!("Failed to get Zalo token: {}", err)
+    })?;
 
-    let templates = ZaloService::get_all_templates(self, db, token.clone())
-      .await
-      .map_err(|err| AppError::BadRequest(err.to_string()))?;
+    let templates =
+      ZaloService::get_all_templates(self, db, token.clone()).await.map_err(|err| {
+        tracing::error!("Failed to get templates: {}", err);
+        anyhow::anyhow!("Failed to get templates: {}", err)
+      })?;
+
+    if templates.is_empty() {
+      return Err(anyhow::anyhow!("No templates found"));
+    }
+
     let template_id = templates[0].template_id;
 
     let payload = SendMessagePayload {
@@ -178,18 +178,25 @@ impl ZaloService {
       tracking_id: format!("{} {}", phone, otp),
     };
 
-    let response = self
-      .client
+    let response = reqwest::Client::new()
       .post(format!("https://business.openapi.zalo.me/message/template"))
       .header("access_token", token.access_token)
       .json(&payload)
       .send()
-      .await?;
+      .await
+      .map_err(|err| {
+        tracing::error!("Failed to send request: {}", err);
+        anyhow::anyhow!("Failed to send request: {}", err)
+      })?;
 
     if !response.status().is_success() {
       let error = response.text().await?;
       tracing::error!("Failed to send message: {}", error);
+      return Err(anyhow::anyhow!("Failed to send message: {}", error));
     }
+
+    let response_text = response.text().await?;
+    tracing::info!("Send message response: {}", response_text);
 
     Ok(())
   }

@@ -1,0 +1,4 @@
+ALTER TABLE users.appointments
+ALTER COLUMN price TYPE INT4,
+ALTER COLUMN surcharge TYPE INT4,
+ALTER COLUMN promotion TYPE INT4; 

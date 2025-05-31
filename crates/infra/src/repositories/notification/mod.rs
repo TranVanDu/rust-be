@@ -96,9 +96,18 @@ impl NotificationRepository for SqlxNotificationRepository {
     let notifications = sqlx::query_as::<_, Notification>(
       r#"
       SELECT * FROM users.notifications
-      WHERE ($1::bigint IS NULL OR user_id = $1)
+      WHERE (
+        (user_id = $1 AND receiver = $3)
+        OR (
+          user_id IS NULL 
+          AND receiver = CASE 
+            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
+            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
+            ELSE $3
+          END
+        )
+      )
       AND ($2::boolean IS NULL OR is_read = $2)
-      AND ($3::text IS NULL OR receiver = $3)
       AND ($4::text IS NULL OR notification_type = $4)
       ORDER BY created_at DESC
       LIMIT $5 OFFSET $6
@@ -119,9 +128,18 @@ impl NotificationRepository for SqlxNotificationRepository {
     let total_items: i64 = sqlx::query_scalar(
       r#"
       SELECT COUNT(*) FROM users.notifications
-      WHERE ($1::bigint IS NULL OR user_id = $1)
+      WHERE (
+        (user_id = $1 AND receiver = $3)
+        OR (
+          user_id IS NULL 
+          AND receiver = CASE 
+            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
+            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
+            ELSE $3
+          END
+        )
+      )
       AND ($2::boolean IS NULL OR is_read = $2)
-      AND ($3::text IS NULL OR receiver = $3)
       AND ($4::text IS NULL OR notification_type = $4)
       "#,
     )

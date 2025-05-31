@@ -49,7 +49,7 @@ pub async fn create_notification(
 ) -> AppResult<()> {
   tracing::info!("Starting notification creation for user_id: {}", user_id);
   let notification = CreateNotification {
-    user_id,
+    user_id: if user_id == 0 { None } else { Some(user_id) },
     title,
     body,
     data,
@@ -57,7 +57,10 @@ pub async fn create_notification(
     notification_type: "APPOINTMENT".to_string(),
     appointment_id,
   };
-  let noti = notification_repo.create(notification).await?;
+  let noti = notification_repo
+    .create(notification)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
   tracing::info!("Notification created successfully: {:#?}", noti);
 
   let mut tokens = vec![];
@@ -174,7 +177,7 @@ pub async fn send_firebase_notification(
 
   let notification = domain::entities::notification::Notification {
     id: 0,
-    user_id,
+    user_id: if user_id == 0 { None } else { Some(user_id) },
     title,
     body,
     receiver,
@@ -248,11 +251,11 @@ pub async fn send_noti_update(
             )
           },
           "PAYMENT" => {
-            // Lễ tân yêu cầu thanh toán
+            // Thanh toán thành công
             (
-              "Yêu cầu thanh toán".to_string(),
+              "Thanh toán thành công".to_string(),
               format!(
-                "Vui lòng thanh toán cho lịch hẹn của {}. Thời gian: {}",
+                "Lịch hẹn của {} đã được thanh toán thành công. Thời gian: {}",
                 user_full_name, res.start_time
               ),
             )
@@ -293,7 +296,10 @@ pub async fn send_noti_update(
             // Kỹ thuật viên hoàn thành lịch hẹn
             (
               "Hoàn thành lịch hẹn".to_string(),
-              format!("Lịch hẹn của {} đã được hoàn thành.", user_full_name),
+              format!(
+                "Lịch hẹn của {} đã được hoàn thành. Vui lòng thanh toán với lễ tân",
+                user_full_name
+              ),
             )
           },
           "IN_PROGRESS" => {
