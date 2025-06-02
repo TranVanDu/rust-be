@@ -341,6 +341,7 @@ pub async fn send_noti_update(
             "ALLRECEPTIONIST".to_string(),
             Some(res.id),
             Some(serde_json::json!({
+              "type": "APPOINTMENT",
               "appointment_id": res.id,
               "user_name": user_full_name,
               "start_time": res.start_time,
@@ -359,6 +360,7 @@ pub async fn send_noti_update(
           body.clone(),
           "ALLRECEPTIONIST".to_string(),
           Some(serde_json::json!({
+            "type": "APPOINTMENT",
             "appointment_id": res.id,
             "user_name": user_full_name,
             "start_time": res.start_time,
@@ -383,6 +385,7 @@ pub async fn send_noti_update(
               "USER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
+                "type": "APPOINTMENT",
                 "appointment_id": res.id,
                 "start_time": res.start_time
               })),
@@ -401,6 +404,7 @@ pub async fn send_noti_update(
                 "TECHNICIAN".to_string(),
                 Some(res.id),
                 Some(serde_json::json!({
+                  "type": "APPOINTMENT",
                   "appointment_id": res.id,
                   "user_name": user_full_name,
                   "start_time": res.start_time
@@ -421,6 +425,7 @@ pub async fn send_noti_update(
               "USER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
+                "type": "APPOINTMENT",
                 "appointment_id": res.id,
                 "start_time": res.start_time,
                 "type": "PAYMENT"
@@ -440,6 +445,7 @@ pub async fn send_noti_update(
               "USER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
+                "type": "APPOINTMENT",
                 "appointment_id": res.id,
                 "start_time": res.start_time
               })),
@@ -458,6 +464,7 @@ pub async fn send_noti_update(
                 "TECHNICIAN".to_string(),
                 Some(res.id),
                 Some(serde_json::json!({
+                  "type": "APPOINTMENT",
                   "appointment_id": res.id,
                   "user_name": user_full_name,
                   "start_time": res.start_time
@@ -482,6 +489,7 @@ pub async fn send_noti_update(
             "TECHNICIAN".to_string(),
             Some(res.id),
             Some(serde_json::json!({
+              "type": "APPOINTMENT",
               "appointment_id": res.id,
               "user_name": user_full_name,
               "start_time": res.start_time
@@ -506,6 +514,7 @@ pub async fn send_noti_update(
                   "TECHNICIAN".to_string(),
                   Some(res.id),
                   Some(serde_json::json!({
+                    "type": "APPOINTMENT",
                     "appointment_id": res.id,
                     "user_name": user_full_name,
                     "start_time": res.start_time
@@ -526,6 +535,7 @@ pub async fn send_noti_update(
             body.clone(),
             "USER".to_string(),
             Some(serde_json::json!({
+              "type": "APPOINTMENT",
               "appointment_id": res.id,
               "start_time": res.start_time,
               "user_name": user_full_name,
@@ -550,6 +560,7 @@ pub async fn send_noti_update(
               "USER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
+                "type": "APPOINTMENT",
                 "appointment_id": res.id,
                 "start_time": res.start_time
               })),
@@ -567,6 +578,7 @@ pub async fn send_noti_update(
                 "RECEPTIONIST".to_string(),
                 Some(res.id),
                 Some(serde_json::json!({
+                  "type": "APPOINTMENT",
                   "appointment_id": res.id,
                   "user_name": user_full_name,
                   "start_time": res.start_time
@@ -587,6 +599,7 @@ pub async fn send_noti_update(
               "USER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
+                "type": "APPOINTMENT",
                 "appointment_id": res.id,
                 "start_time": res.start_time
               })),
@@ -605,6 +618,7 @@ pub async fn send_noti_update(
                 "RECEPTIONIST".to_string(),
                 Some(res.id),
                 Some(serde_json::json!({
+                  "type": "APPOINTMENT",
                   "appointment_id": res.id,
                   "user_name": user_full_name,
                   "start_time": res.start_time
@@ -625,6 +639,7 @@ pub async fn send_noti_update(
           body.clone(),
           "USER".to_string(),
           Some(serde_json::json!({
+            "type": "APPOINTMENT",
             "appointment_id": res.id,
             "start_time": res.start_time,
             "user_name": user_full_name,

@@ -6,10 +6,10 @@ use domain::{
   entities::{
     appointment::{
       Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
-      CreateAppointmentRequest, UpdateAppointmentRequest,
+      CreateAppointmentRequest, PaymentAppointmentRequest, UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
-    user::UserWithPassword,
+    user::{User, UserWithPassword},
   },
   repositories::appointment_repository::AppointmentRepository,
 };
@@ -266,6 +266,10 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           completed_at = CASE
             WHEN $2 = 'COMPLETED' AND status != 'COMPLETED' THEN CURRENT_TIMESTAMP
             ELSE completed_at
+          END,
+          started_at = CASE
+            WHEN $2 = 'IN_PROGRESS' AND status != 'IN_PROGRESS' THEN CURRENT_TIMESTAMP
+            ELSE started_at
           END
         WHERE id = $12
         RETURNING *
@@ -377,6 +381,181 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     }
 
     Ok(res)
+  }
+
+  async fn payment_appointment(
+    &self,
+    user: UserWithPassword,
+    id: i64,
+    payload: PaymentAppointmentRequest,
+  ) -> AppResult<AppointmentWithServices> {
+    let appointment = sqlx::query_as::<_, Appointment>(
+      r#"
+      SELECT *
+      FROM users.appointments
+      WHERE id = $1
+      "#,
+    )
+    .bind(id)
+    .fetch_one(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    let get_user = sqlx::query_as::<_, User>(
+      r#"
+    SELECT *
+    FROM users.tbl_users
+    WHERE pk_user_id = $1
+    "#,
+    )
+    .bind(appointment.user_id)
+    .fetch_one(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    if appointment.status != "COMPLETED" {
+      return Err(AppError::BadRequest(
+        "Lịch hẹn cần được hoàn thành trước khi thanh toán".to_string(),
+      ));
+    }
+
+    if payload.user_balance > get_user.balance {
+      return Err(AppError::BadRequest("Số dư tiền khách hàng không đúng".to_string()));
+    }
+    let mut amount_payment = appointment.total_price;
+
+    if payload.user_balance > 0 {
+      amount_payment = amount_payment - payload.user_balance;
+    }
+
+    let point = ((appointment.total_price as f64) / 1000.0).round() as i32;
+
+    let mut tx = self.db.begin().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    if amount_payment > 0 {
+      let _ = sqlx::query_as::<_, domain::entities::deposit::Deposit>(
+        r#"
+      INSERT INTO users.deposits (
+        user_id, amount, payment_method, status, created_by, deposit_type
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+      "#,
+      )
+      .bind(appointment.user_id)
+      .bind(amount_payment)
+      .bind(payload.payment_method.clone())
+      .bind("COMPLETED")
+      .bind(user.pk_user_id)
+      .bind("PAYMENT")
+      .fetch_one(&mut *tx)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+    }
+
+    if payload.user_balance > 0 {
+      let _ = sqlx::query_as::<_, domain::entities::deposit::Deposit>(
+        r#"
+      INSERT INTO users.deposits (
+        user_id, amount, payment_method, status, created_by, deposit_type
+      )
+      VALUES ($1, $2, $3, $4, $5, $6)
+      RETURNING *
+      "#,
+      )
+      .bind(appointment.user_id)
+      .bind(payload.user_balance)
+      .bind(payload.payment_method)
+      .bind("COMPLETED")
+      .bind(user.pk_user_id)
+      .bind("WITHDRAW")
+      .fetch_one(&mut *tx)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+      sqlx::query(
+        r#"
+      UPDATE users.tbl_users
+      SET balance = balance - $1,
+          loyalty_points = loyalty_points + $2
+      WHERE pk_user_id = $3
+      "#,
+      )
+      .bind(payload.user_balance)
+      .bind(point)
+      .bind(appointment.user_id)
+      .execute(&mut *tx)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+    } else {
+      sqlx::query(
+        r#"
+      UPDATE users.tbl_users
+      SET loyalty_points = loyalty_points + $1
+      WHERE pk_user_id = $2
+      "#,
+      )
+      .bind(point)
+      .bind(appointment.user_id)
+      .execute(&mut *tx)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+    }
+
+    // Update appointment status to PAID
+    let _ = sqlx::query_as::<_, Appointment>(
+      r#"
+      UPDATE users.appointments
+      SET status = 'PAYMENT', updated_by = $1
+      WHERE id = $2
+      RETURNING *
+      "#,
+    )
+    .bind(user.pk_user_id)
+    .bind(id)
+    .fetch_one(&mut *tx)
+    .await
+    .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    tx.commit().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    // Get updated appointment with services
+    let result = self.get_appointment(user, id).await?;
+
+    // Send notification
+    let db = self.db.clone();
+    let notification_repo = Arc::new(SqlxNotificationRepository { db: db.clone() });
+    let notification_token_repo = Arc::new(SqlxNotiTokenRepository { db: db.clone() });
+    let result_clone = result.clone();
+
+    tokio::spawn(async move {
+      match create_notification(
+        &db,
+        notification_repo,
+        notification_token_repo,
+        appointment.user_id,
+        "Thanh toán thành công".to_string(),
+        format!(
+          "Lịch hẹn của {} đã được thanh toán thành công. Bạn được nhận thêm vào {} điểm",
+          payload.full_name, point
+        ),
+        "USER".to_string(),
+        Some(result_clone.id),
+        Some(serde_json::json!({
+          "appointment_id": result_clone.id,
+          "user_name": payload.full_name,
+          "start_time": result_clone.start_time,
+          "user_id": appointment.user_id
+        })),
+      )
+      .await
+      {
+        Ok(_) => tracing::info!("Payment notification sent successfully"),
+        Err(e) => tracing::error!("Failed to send payment notification: {:?}", e),
+      }
+    });
+
+    Ok(result)
   }
 
   async fn get_appointment(
@@ -524,7 +703,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
 
       if count_confirm > 0 {
         let res = sqlx::query_as::<_, AppointmentExtra>(
-        r#"
+          r#"
           SELECT a.*, 
                  json_agg(json_build_object(
                    'id', s.id,
@@ -542,15 +721,14 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           LEFT JOIN users.service_items s ON aps.service_id = s.id
           LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id
           WHERE a.user_id = $1 
-          AND a.status = 'CONFIRMED' 
-          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
+          AND a.status = 'CONFIRMED'
           GROUP BY a.id, u.pk_user_id, u.full_name, u.phone
           ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,
-      )
-      .bind(user.pk_user_id)
-      .fetch_all(&self.db)
-      .await?;
+        )
+        .bind(user.pk_user_id)
+        .fetch_all(&self.db)
+        .await?;
         return Ok(res);
       }
 
@@ -563,7 +741,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
 
       if count_pending > 0 {
         let res = sqlx::query_as::<_, AppointmentExtra>(
-        r#"
+          r#"
           SELECT a.*, 
                  json_agg(json_build_object(
                    'id', s.id,
@@ -582,14 +760,13 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id
           WHERE a.user_id = $1 
           AND a.status = 'PENDING'
-          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
           GROUP BY a.id, u.pk_user_id, u.full_name, u.phone
           ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,
-      )
-      .bind(user.pk_user_id)
-      .fetch_all(&self.db)
-      .await?;
+        )
+        .bind(user.pk_user_id)
+        .fetch_all(&self.db)
+        .await?;
 
         return Ok(res);
       }
@@ -618,7 +795,6 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           LEFT JOIN users.service_items s ON aps.service_id = s.id
           LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id
           WHERE a.status IN ('PENDING')
-          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
           GROUP BY a.id, u.pk_user_id, u.full_name, u.phone
           ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,
@@ -651,7 +827,6 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id
           WHERE a.technician_id = $1
           AND a.status IN ('CONFIRMED')
-          AND TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') > (CURRENT_TIMESTAMP + INTERVAL '7 hours')
           GROUP BY a.id, u.pk_user_id, u.full_name, u.phone
           ORDER BY TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY') ASC
         "#,

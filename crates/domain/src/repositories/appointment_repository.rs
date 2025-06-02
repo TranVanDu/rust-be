@@ -5,7 +5,7 @@ use modql::filter::ListOptions;
 use crate::entities::{
   appointment::{
     AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest,
-    UpdateAppointmentRequest,
+    PaymentAppointmentRequest, UpdateAppointmentRequest,
   },
   common::PaginationMetadata,
   user::UserWithPassword,
@@ -26,6 +26,20 @@ pub trait AppointmentRepository: Send + Sync {
     id: i64,
     payload: UpdateAppointmentRequest,
   ) -> AppResult<AppointmentWithServices>;
+
+  async fn payment_appointment(
+    &self,
+    user: UserWithPassword,
+    id: i64,
+    payload: PaymentAppointmentRequest,
+  ) -> AppResult<AppointmentWithServices>;
+
+  // async fn check_balance_payment(
+  //   &self,
+  //   user: UserWithPassword,
+  //   id: i64,
+  //   payload: PaymentAppointmentRequest,
+  // ) -> AppResult<AppointmentWithServices>;
 
   async fn get_appointments(
     &self,

@@ -4,7 +4,6 @@ use core_app::{AppResult, AppState, errors::AppError};
 use domain::entities::common::PaginationOptions;
 use domain::entities::notification::Notification;
 use domain::entities::notification_token::{NotificationToken, PayloadNotificationToken};
-use domain::entities::zalo::ZaloTemplate;
 use domain::services::notification_token::NotificationTokenUseCase;
 use infra::events::zalo::ZaloService;
 use infra::firebase::NotificationService;

@@ -20,6 +20,7 @@ pub struct Appointment {
   pub promotion: i64,
   pub price: i64,
   pub completed_at: Option<DateTime<Utc>>,
+  pub started_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
   pub total_price: i64,
@@ -40,6 +41,7 @@ pub struct AppointmentExtra {
   pub promotion: i64,
   pub price: i64,
   pub completed_at: Option<DateTime<Utc>>,
+  pub started_at: Option<DateTime<Utc>>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
   pub services: serde_json::Value,
@@ -75,6 +77,15 @@ pub struct UpdateAppointmentRequest {
   pub promotion: Option<i64>,
   pub price: Option<i64>,
   pub completed_at: Option<DateTime<Utc>>,
+  pub started_at: Option<DateTime<Utc>>,
+}
+
+#[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
+pub struct PaymentAppointmentRequest {
+  pub status: Option<String>,
+  pub user_balance: i64,
+  pub full_name: String,
+  pub payment_method: Option<String>,
 }
 
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
@@ -95,6 +106,7 @@ pub struct AppointmentWithServices {
   pub promotion: i64,
   pub price: i64,
   pub completed_at: Option<DateTime<Utc>>,
+  pub started_at: Option<DateTime<Utc>>,
   pub total_price: i64,
 }
 

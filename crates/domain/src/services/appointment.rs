@@ -6,8 +6,8 @@ use crate::{
   entities::{
     appointment::{
       AppointmentExtra, AppointmentFilter, AppointmentWithServices,
-      CreateAppointmentForNewCustomerRequest, CreateAppointmentRequest, Status,
-      UpdateAppointmentRequest,
+      CreateAppointmentForNewCustomerRequest, CreateAppointmentRequest, PaymentAppointmentRequest,
+      Status, UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
     user::{PhoneFilterConvert, RequestCreateUser, Role, UserWithPassword},
@@ -151,6 +151,15 @@ impl AppointmentUseCase {
     appointment_repo.get_appointment_by_technician(user, filter, list_options).await
   }
 
+  pub async fn payment_appointment(
+    appointment_repo: &dyn AppointmentRepository,
+    user: UserWithPassword,
+    id: i64,
+    payload: PaymentAppointmentRequest,
+  ) -> AppResult<AppointmentWithServices> {
+    appointment_repo.payment_appointment(user, id, payload).await
+  }
+
   pub async fn create_appointment_for_new_customer(
     appointment_repo: &dyn AppointmentRepository,
     user_repo: &dyn UserRepository,
@@ -168,6 +177,8 @@ impl AppointmentUseCase {
       is_verify: Some(false),
       date_of_birth: payload.date_of_birth,
       address: None,
+      membership_level: Some("BRONZE".to_string()),
+      balance: Some(0),
     };
 
     // Check if phone number already exists
@@ -189,7 +200,12 @@ impl AppointmentUseCase {
         date_of_birth: None,
         address: None,
         avatar: None,
+        membership_level: "BRONZE".to_string(),
+        balance: 0,
+        loyalty_points: 0,
       });
+
+    tracing::info!("exist_user: {:#?}", exist_user);
 
     let new_user;
 

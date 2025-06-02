@@ -12,6 +12,12 @@ pub struct AdminStatistics {
   pub service_statistics: Vec<ServiceStatistics>,
   pub technician_statistics: Vec<TechnicianStats>,
   pub daily_statistics: Vec<DailyStatistics>,
+  pub avg_appointment_value: i64,
+  pub total_pending: i64,
+  pub payment_appointments: i64,
+  pub hourly_distribution: Vec<(i32, i64)>,
+  pub appointment_status_counts: Vec<(String, i64)>,
+  pub parent_service_statistics: Vec<(i64, String, i64)>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
@@ -21,15 +27,19 @@ pub struct ReceptionistStatistics {
   pub pending_appointments: i64,
   pub completed_appointments: i64,
   pub cancelled_appointments: i64,
+  pub total_revenue: i64,
   pub daily_statistics: Vec<DailyStatistics>,
+  pub appointment_status_counts: Vec<(String, i64)>,
+  pub parent_service_statistics: Vec<(i64, String, i64)>,
 }
 
 #[derive(Debug, Serialize, ToSchema)]
 pub struct CustomerStatistics {
   pub total_appointments: i64,
   pub completed_appointments: i64,
-  pub cancelled_appointments: i64,
+  pub confirmed_appointments: i64,
   pub total_spent: i64,
+  pub today_appointments: i64,
   pub favorite_services: Vec<ServiceStatistics>,
   pub appointment_history: Vec<DailyStatistics>,
 }
@@ -39,7 +49,7 @@ pub struct TechnicianStatistics {
   pub total_appointments: i64,
   pub today_appointments: i64,
   pub completed_appointments: i64,
-  pub cancelled_appointments: i64,
+  pub confirmed_appointments: i64,
   pub total_revenue: i64,
   pub service_statistics: Vec<ServiceStatistics>,
   pub daily_statistics: Vec<DailyStatistics>,

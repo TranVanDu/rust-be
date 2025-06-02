@@ -8,8 +8,8 @@ use domain::{
   entities::{
     common::PaginationOptions,
     user::{
-      RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
-      UserWithPassword,
+      PhoneFilterConvert, RequestCreateUser, RequestGetUser, RequestUpdateUser, User, UserFilter,
+      UserFilterConvert, UserWithPassword,
     },
   },
   services::user::UserUseCase,
@@ -124,4 +124,27 @@ pub async fn get_all_technician(
   let users = UserUseCase::get_all_technician(&user_repo, user).await?;
 
   Ok(Json(users))
+}
+
+#[utoipa::path(
+    get,
+    path = "/api/v1/users/get_user_by_phone",
+    params(
+          ("phone" = String, Query, description = "Phone number")
+    ),
+    tag="User Service",
+    responses(
+        (status = 200, description = "successfully", body = User),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn get_user_by_phone(
+  State(state): State<Arc<AppState>>,
+  Query(filter): Query<PhoneFilterConvert>,
+) -> AppResult<Json<User>> {
+  let user_repo = SqlxUserRepository { db: state.db.clone() };
+  let user_with_password = UserUseCase::get_user_by_phone(&user_repo, filter).await?;
+
+  Ok(Json(User::from(user_with_password)))
 }

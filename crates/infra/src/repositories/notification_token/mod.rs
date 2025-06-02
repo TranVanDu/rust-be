@@ -83,6 +83,7 @@ impl NotificationTokenRepository for SqlxNotiTokenRepository {
     id: i64,
     payload: PayloadNotificationToken,
   ) -> AppResult<NotificationToken> {
+    tracing::info!("{:?}PayloadNotificationToken", payload);
     let token = sqlx::query_as::<_, NotificationToken>(
       r#"
         UPDATE "users"."notification_tokens"

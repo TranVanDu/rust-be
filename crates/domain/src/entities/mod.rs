@@ -2,6 +2,7 @@ pub mod appointment;
 pub mod auth;
 pub mod chat;
 pub mod common;
+pub mod deposit;
 pub mod notification;
 pub mod notification_token;
 pub mod profile;

@@ -14,9 +14,10 @@ impl StatisticsUseCase {
   }
 
   pub async fn get_receptionist_statistics(
-    repo: &dyn StatisticsRepository
+    repo: &dyn StatisticsRepository,
+    user_id: i64,
   ) -> AppResult<ReceptionistStatistics> {
-    repo.get_receptionist_statistics().await
+    repo.get_receptionist_statistics(user_id).await
   }
 
   pub async fn get_customer_statistics(

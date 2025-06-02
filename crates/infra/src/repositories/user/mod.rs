@@ -2,7 +2,9 @@ use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
 
 use domain::{
-  entities::user::{PhoneFilterConvert, RequestCreateUser, User, UserWithPassword},
+  entities::user::{
+    CheckBalanceUser, PhoneFilterConvert, RequestCreateUser, User, UserWithPassword,
+  },
   repositories::user_repository::UserRepository,
 };
 
@@ -10,6 +12,8 @@ use sqlx::PgPool;
 
 use crate::database::schema::UserDmc;
 use crate::repositories::base::{create, get_by_sth};
+
+use super::base::get_by_id;
 
 pub struct SqlxUserRepository {
   pub db: PgPool,
@@ -46,5 +50,13 @@ impl UserRepository for SqlxUserRepository {
     filter: PhoneFilterConvert,
   ) -> AppResult<UserWithPassword> {
     get_by_sth::<UserDmc, PhoneFilterConvert, _>(self.db.clone(), Some(filter)).await
+  }
+
+  async fn get_user_by_id(
+    &self,
+    id: i64,
+  ) -> AppResult<User> {
+    let user = get_by_id::<UserDmc, _>(&self.db, id).await?;
+    Ok(user)
   }
 }

@@ -23,5 +23,7 @@ pub fn routes() -> Router<Arc<AppState>> {
 }
 
 pub fn routes_other() -> Router<Arc<AppState>> {
-  Router::new().route("/users/technicians", get(services::get_all_technician))
+  Router::new()
+    .route("/users/technicians", get(services::get_all_technician))
+    .route("/users/get_user_by_phone", get(services::get_user_by_phone))
 }

@@ -28,6 +28,18 @@ pub struct User {
   pub date_of_birth: Option<String>,
   pub address: Option<String>,
   pub avatar: Option<String>,
+  pub membership_level: String,
+  pub balance: i64,
+  pub loyalty_points: i64,
+}
+
+#[derive(Serialize, FromRow, Fields, Debug, Clone, ToSchema)] // chuyển đổi Struct về Json
+pub struct CheckBalanceUser {
+  pub pk_user_id: i64,
+  pub phone: Option<String>,
+  pub membership_level: String,
+  pub balance: i64,
+  pub loyalty_points: i64,
 }
 
 #[derive(FromRow, Debug, Fields, Clone)]
@@ -44,6 +56,9 @@ pub struct UserWithPassword {
   pub date_of_birth: Option<String>,
   pub address: Option<String>,
   pub avatar: Option<String>,
+  pub membership_level: String,
+  pub balance: i64,
+  pub loyalty_points: i64,
 }
 
 // Chuyển từ UserWithPassword sang User (loại bỏ password_hash)
@@ -61,6 +76,9 @@ impl From<UserWithPassword> for User {
       date_of_birth: user_with_pw.date_of_birth,
       address: user_with_pw.address,
       avatar: user_with_pw.avatar,
+      membership_level: user_with_pw.membership_level,
+      balance: user_with_pw.balance,
+      loyalty_points: user_with_pw.loyalty_points,
     }
   }
 }
@@ -86,6 +104,9 @@ pub struct RequestUpdateUser {
   #[serde(deserialize_with = "trim_option_string")]
   pub address: Option<String>,
   pub date_of_birth: Option<String>,
+  pub membership_level: Option<String>,
+  pub balance: Option<i64>,
+  pub loyalty_points: Option<i64>,
 }
 
 #[derive(Deserialize, FromRow, Fields, Serialize, ToSchema)]
@@ -112,6 +133,8 @@ pub struct RequestCreateUser {
   #[serde(deserialize_with = "trim_option_string")]
   pub address: Option<String>,
   pub date_of_birth: Option<String>,
+  pub membership_level: Option<String>,
+  pub balance: Option<i64>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone, IntoParams, ToSchema)]
@@ -124,6 +147,8 @@ pub struct UserFilter {
   pub is_active: Option<bool>,
   pub is_verify: Option<bool>,
   pub role: Option<Role>,
+  pub membership_level: Option<String>,
+  pub balance: Option<i64>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone)]

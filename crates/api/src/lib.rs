@@ -6,6 +6,7 @@ use core_app::AppState;
 pub mod appointment;
 pub mod auth;
 pub mod chat;
+pub mod deposit;
 pub mod macro_service;
 pub mod notification;
 pub mod notification_token;
@@ -45,6 +46,7 @@ pub fn router_v1_private() -> Router<Arc<AppState>> {
       .merge(notification_token::routes())
       .merge(notification::routes())
       .merge(statistics::routes::routes())
+      .merge(deposit::routes::routes())
       .layer(DefaultBodyLimit::max(5 * 1024 * 1024)), // 10MB
   )
 }

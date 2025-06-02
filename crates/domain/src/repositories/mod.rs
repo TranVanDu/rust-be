@@ -1,6 +1,7 @@
 pub mod appointment_repository;
 pub mod auth_repository;
 pub mod chat_repository;
+pub mod deposit_repository;
 pub mod image_repository;
 pub mod noti_token_repository;
 pub mod notification_repository;

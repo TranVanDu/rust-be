@@ -68,7 +68,8 @@ pub async fn get_receptionist_statistics(
     return Err(AppError::Forbidden("Only receptionist can access this endpoint".to_string()));
   }
 
-  let statistics = StatisticsUseCase::get_receptionist_statistics(&repo).await?;
+  let statistics =
+    StatisticsUseCase::get_receptionist_statistics(&repo, auth_user.pk_user_id).await?;
 
   Ok(Json(statistics))
 }

@@ -20,4 +20,5 @@ pub fn routes() -> Router<Arc<AppState>> {
       "/appointments/create-for-new-customer",
       post(services::create_appointment_for_new_customer_api),
     )
+    .route("/appointments/{id}/payment", post(services::payment_appointment))
 }

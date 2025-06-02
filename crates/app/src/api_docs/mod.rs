@@ -24,6 +24,12 @@ use utoipa_swagger_ui::SwaggerUi;
     api::auth::services::get_current_user_service,
     api::auth::services::logout_user_service,
 
+    //deposit
+    api::deposit::services::create_deposit,
+    api::deposit::services::get_deposits,
+    api::deposit::services::get_deposit_by_id,
+    api::deposit::services::update_deposit_status,
+    api::deposit::services::get_deposits_by_user_id,
 
     //profile
     api::profile::services::change_password,

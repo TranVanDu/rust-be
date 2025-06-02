@@ -179,6 +179,8 @@ pub async fn check_phone(
         role: Role::CUSTOMER,
         is_verify: Some(false),
         is_active: Some(true),
+        membership_level: Some("BRONZE".to_string()),
+        balance: Some(0),
       };
 
       let state_clone = state.clone();

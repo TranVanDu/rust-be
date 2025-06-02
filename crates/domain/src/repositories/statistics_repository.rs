@@ -8,7 +8,10 @@ use crate::entities::statistics::{
 #[async_trait]
 pub trait StatisticsRepository: Send + Sync {
   async fn get_admin_statistics(&self) -> AppResult<AdminStatistics>;
-  async fn get_receptionist_statistics(&self) -> AppResult<ReceptionistStatistics>;
+  async fn get_receptionist_statistics(
+    &self,
+    user_id: i64,
+  ) -> AppResult<ReceptionistStatistics>;
   async fn get_customer_statistics(
     &self,
     user_id: i64,

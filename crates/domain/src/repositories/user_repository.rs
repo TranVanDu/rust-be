@@ -1,6 +1,6 @@
 use crate::entities::user::{
-  PhoneFilterConvert, RequestCreateUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
-  UserWithPassword,
+  CheckBalanceUser, PhoneFilterConvert, RequestCreateUser, RequestUpdateUser, User, UserFilter,
+  UserFilterConvert, UserWithPassword,
 };
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
@@ -143,4 +143,8 @@ pub trait UserRepository: Send + Sync {
     &self,
     filter: PhoneFilterConvert,
   ) -> AppResult<UserWithPassword>;
+  async fn get_user_by_id(
+    &self,
+    id: i64,
+  ) -> AppResult<User>;
 }

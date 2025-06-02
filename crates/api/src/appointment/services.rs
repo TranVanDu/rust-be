@@ -2,11 +2,11 @@ use axum::{
   Extension, Json,
   extract::{Path, Query, State},
 };
-use core_app::{AppResult, AppState};
+use core_app::{errors::AppError, AppResult, AppState};
 use domain::{
   entities::{
     appointment::{
-      AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentRequest, UpdateAppointmentRequest, CreateAppointmentForNewCustomerRequest
+      AppointmentExtra, AppointmentFilter, AppointmentWithServices, CreateAppointmentForNewCustomerRequest, CreateAppointmentRequest, PaymentAppointmentRequest, UpdateAppointmentRequest
     },
     common::{GetPaginationList, PaginationOptions},
     user::UserWithPassword,
@@ -270,6 +270,36 @@ pub async fn create_appointment_for_new_customer_api(
 
   Ok(Json(created_appointment))
 }
+
+#[utoipa::path(
+    patch,
+    path = "/api/v1/appointment/{id}/payment",
+    tag="Appointment Service",
+    request_body = PaymentAppointmentRequest,
+    responses(
+        (status = 200, description = "Login successfully", body = AppointmentWithServices),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn payment_appointment(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+  Path(id): Path<i64>,
+  Json(req): Json<PaymentAppointmentRequest>,
+) -> AppResult<Json<AppointmentWithServices>> {
+
+   if user.role != "RECEPTIONIST" && user.role != "ADMIN" {
+    return Err(AppError::Forbidden("You don't have permission".to_string()));
+  }
+  let appointment_repo = SqlxAppointmentRepository { db: state.db.clone() };
+
+  let appointment = AppointmentUseCase::payment_appointment(&appointment_repo, user, id, req).await?;
+
+  Ok(Json(appointment))
+}
+
+
 
 
   

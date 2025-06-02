@@ -43,13 +43,12 @@ pub struct NotificationFilter {
   pub notification_type: Option<String>,
 }
 
-#[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum NotificationType {
-  APPOINTMENT, // Thông báo về lịch hẹn
-  PROMOTION,   // Thông báo khuyến mãi
-  SURCHARGE,   // Thông báo phụ phí
-  PAYMENT,     // Thông báo thanh toán
-  SYSTEM,      // Thông báo hệ thống
+  Appointment,
+  Service,
+  Deposit,
+  System,
 }
 
 #[derive(Debug, Serialize, Deserialize, Clone, ToSchema)]
