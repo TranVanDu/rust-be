@@ -28,23 +28,29 @@ impl StatisticsRepository for SqlxStatisticsRepository {
       payment_appointments,
     ): (i64, i64, i64, i64, i64, i64, i64, i64) = sqlx::query_as(
       r#"
-      WITH stats AS (
+      WITH appointment_stats AS (
         SELECT 
-          COALESCE(SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN (s.price + a.surcharge - a.promotion)::bigint ELSE 0 END), 0)::bigint as total_revenue,
+          a.id,
+          a.status,
+          COALESCE(a.total_price, 0)::bigint as appointment_revenue
+        FROM users.appointments a
+        GROUP BY a.id, a.status
+      ),
+      stats AS (
+        SELECT 
+          COALESCE(SUM(CASE WHEN status IN ('COMPLETED', 'PAYMENT') THEN appointment_revenue ELSE 0 END), 0)::bigint as total_revenue,
           COUNT(*)::bigint as total_appointments,
-          COUNT(CASE WHEN a.status = 'COMPLETED' THEN 1 END)::bigint as completed_appointments,
-          COUNT(CASE WHEN a.status = 'CANCELLED' THEN 1 END)::bigint as cancelled_appointments,
-          COUNT(CASE WHEN a.status = 'PENDING' THEN 1 END)::bigint as pending_appointments,
-          COUNT(CASE WHEN a.status = 'PAYMENT' THEN 1 END)::bigint as payment_appointments,
+          COUNT(CASE WHEN status = 'COMPLETED' THEN 1 END)::bigint as completed_appointments,
+          COUNT(CASE WHEN status = 'CANCELLED' THEN 1 END)::bigint as cancelled_appointments,
+          COUNT(CASE WHEN status = 'PENDING' THEN 1 END)::bigint as pending_appointments,
+          COUNT(CASE WHEN status = 'PAYMENT' THEN 1 END)::bigint as payment_appointments,
           CASE 
-            WHEN COUNT(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN 1 END) > 0 
-            THEN (COALESCE(SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN (s.price + a.surcharge - a.promotion)::bigint ELSE 0 END), 0) / 
-                 COUNT(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN 1 END))::bigint
+            WHEN COUNT(CASE WHEN status IN ('COMPLETED', 'PAYMENT') THEN 1 END) > 0 
+            THEN (COALESCE(SUM(CASE WHEN status IN ('COMPLETED', 'PAYMENT') THEN appointment_revenue ELSE 0 END), 0) / 
+                 COUNT(CASE WHEN status IN ('COMPLETED', 'PAYMENT') THEN 1 END))::bigint
             ELSE 0 
           END as avg_appointment_value
-        FROM users.appointments a
-        LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
-        LEFT JOIN users.service_items s ON aps.service_id = s.id
+        FROM appointment_stats
       ),
       customer_count AS (
         SELECT COUNT(*)::bigint as total_customers
@@ -75,14 +81,15 @@ impl StatisticsRepository for SqlxStatisticsRepository {
     let service_statistics: Vec<ServiceStatistics> = sqlx::query_as(
       r#"
       SELECT 
-          s.id as service_id,
-          s.service_name,
-          COUNT(*) as total_count,
-          SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::BIGINT as total_revenue
+        s.id as service_id,
+        s.service_name,
+        COUNT(DISTINCT a.id) as total_count,
+        SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::BIGINT as total_revenue
       FROM users.appointments a
       JOIN users.appointments_services aps ON a.id = aps.appointment_id
       JOIN users.service_items s ON aps.service_id = s.id
       GROUP BY s.id, s.service_name
+      HAVING COUNT(DISTINCT a.id) > 0
       ORDER BY total_count DESC
       "#,
     )
@@ -96,14 +103,12 @@ impl StatisticsRepository for SqlxStatisticsRepository {
       r#"
       SELECT 
         TO_CHAR(TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY'), 'YYYY-MM-DD') as date,
-        COUNT(*)::bigint as total_appointments,
-        SUM((s.price + a.surcharge - a.promotion)::bigint)::bigint as total_revenue,
+        COUNT(DISTINCT a.id)::bigint as total_appointments,
+        SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::bigint as total_revenue,
         COUNT(DISTINCT a.user_id)::bigint as unique_customers,
         COUNT(DISTINCT aps.technician_id)::bigint as active_technicians
       FROM users.appointments a
-      JOIN users.appointments_services aps ON a.id = aps.appointment_id
-      JOIN users.service_items s ON aps.service_id = s.id
-
+      LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
       GROUP BY TO_CHAR(TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY'), 'YYYY-MM-DD')
       ORDER BY date ASC
       "#,
@@ -136,12 +141,11 @@ impl StatisticsRepository for SqlxStatisticsRepository {
         t.pk_user_id as technician_id,
         t.full_name as technician_name,
         COUNT(DISTINCT a.id)::bigint as total_appointments,
-        SUM((s.price + a.surcharge - a.promotion)::bigint)::bigint as total_revenue,
+        SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::bigint as total_revenue,
         COUNT(DISTINCT a.user_id)::bigint as unique_customers,
         ROUND(AVG(EXTRACT(EPOCH FROM (TO_TIMESTAMP(a.end_time, 'HH24:MI DD/MM/YYYY') - TO_TIMESTAMP(a.start_time, 'HH24:MI DD/MM/YYYY')))/3600)::numeric, 2)::bigint as avg_service_time
       FROM users.appointments a
-      JOIN users.appointments_services aps ON a.id = aps.appointment_id
-      JOIN users.service_items s ON aps.service_id = s.id
+      LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
       JOIN users.tbl_users t ON aps.technician_id = t.pk_user_id
       GROUP BY t.pk_user_id, t.full_name
       ORDER BY total_revenue DESC
@@ -522,16 +526,16 @@ impl StatisticsRepository for SqlxStatisticsRepository {
     let service_statistics: Vec<ServiceStatistics> = sqlx::query_as(
       r#"
       WITH service_stats AS (
-        SELECT 
-          s.id as service_id,
-          s.service_name,
-          COUNT(DISTINCT a.id) as total_count,
-          SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::BIGINT as total_revenue
-        FROM users.appointments a
-        JOIN users.appointments_services aps ON a.id = aps.appointment_id
-        JOIN users.service_items s ON aps.service_id = s.id
-        WHERE a.technician_id = $1
-        GROUP BY s.id, s.service_name
+      SELECT 
+        s.id as service_id,
+        s.service_name,
+        COUNT(DISTINCT a.id) as total_count,
+        SUM(CASE WHEN a.status IN ('COMPLETED', 'PAYMENT') THEN a.total_price ELSE 0 END)::BIGINT as total_revenue
+      FROM users.appointments a
+      JOIN users.appointments_services aps ON a.id = aps.appointment_id
+      JOIN users.service_items s ON aps.service_id = s.id
+      WHERE a.technician_id = $1
+      GROUP BY s.id, s.service_name
       )
       SELECT 
         service_id,
