@@ -140,4 +140,11 @@ impl ProfileUseCase {
 
     profile_repo.update_profile_image(user.pk_user_id, image_path.clone()).await
   }
+
+  pub async fn delete_account(
+    profile_repo: &dyn ProfileRepository,
+    user: UserWithPassword,
+  ) -> AppResult<bool> {
+    profile_repo.delete_account(user).await
+  }
 }

@@ -3,10 +3,12 @@ use domain::entities::appointment::AppointmentService;
 use domain::entities::appointment::{AppointmentFilter, AppointmentWithServices};
 use domain::entities::common::PaginationMetadata;
 use domain::entities::service_child::ServiceChild;
+use domain::entities::user::Point;
 use modql::filter::{ListOptions, OrderBy};
 use sqlx::PgPool;
 
 pub use crate::repositories::appointment::send_noti::*;
+use crate::repositories::base::pagination;
 
 pub async fn check_exit_service(
   db: &PgPool,
@@ -246,20 +248,14 @@ pub async fn get_appointments(
   Ok((appointments, metadata))
 }
 
-pub async fn pagination(
-  total_items: i64,
-  limit: u64,
-  offset: u64,
-) -> AppResult<PaginationMetadata> {
-  let total_pages = (total_items as f64 / limit as f64).ceil() as u64;
-  let current_page = (offset / limit) + 1;
-
-  let metadata = PaginationMetadata {
-    total_items: total_items as u64,
-    current_page: current_page as u64,
-    per_page: limit as u64,
-    total_pages,
-  };
-
-  Ok(metadata)
+pub fn get_membership_level(loyalty_points: i64) -> &'static str {
+  if loyalty_points >= Point::VIP as i64 {
+    "VIP"
+  } else if loyalty_points >= Point::DIAMOND as i64 {
+    "DIAMOND"
+  } else if loyalty_points >= Point::GOLD as i64 {
+    "GOLD"
+  } else {
+    "BRONZE"
+  }
 }

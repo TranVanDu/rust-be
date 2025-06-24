@@ -38,4 +38,9 @@ pub trait ProfileRepository: Send + Sync {
     id: i64,
     image_path: String,
   ) -> AppResult<User>;
+
+  async fn delete_account(
+    &self,
+    user: UserWithPassword,
+  ) -> AppResult<bool>;
 }

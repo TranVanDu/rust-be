@@ -5,6 +5,7 @@ use modql::filter::ListOptions;
 use crate::entities::{
   common::PaginationMetadata,
   notification::{CreateNotification, Notification, NotificationFilter, UpdateNotification},
+  user::UserWithPassword,
 };
 
 #[async_trait]
@@ -31,4 +32,10 @@ pub trait NotificationRepository: Send + Sync {
     &self,
     id: i64,
   ) -> AppResult<bool>;
+
+  async fn un_read(
+    &self,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+  ) -> AppResult<i64>;
 }

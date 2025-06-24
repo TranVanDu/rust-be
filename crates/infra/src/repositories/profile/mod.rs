@@ -1,13 +1,22 @@
+use super::{
+  appointment::send_noti::send_firebase_notification, image::LocalImageService,
+  notification::SqlxNotificationRepository, notification_token::SqlxNotiTokenRepository,
+};
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
 use domain::{
   entities::{
+    notification::CreateNotification,
     profile::UpdateProfileRequest,
     user::{User, UserWithPassword},
   },
-  repositories::profile_repository::ProfileRepository,
+  repositories::{
+    image_repository::ImageRepository, notification_repository::NotificationRepository,
+    profile_repository::ProfileRepository,
+  },
 };
 use sqlx::PgPool;
+use std::sync::Arc;
 use utils::password::{hash_password, verify_password};
 
 pub struct SqlxProfileRepository {
@@ -146,5 +155,100 @@ impl ProfileRepository for SqlxProfileRepository {
     })?;
 
     Ok(User::from(user_with_password))
+  }
+
+  async fn delete_account(
+    &self,
+    user: UserWithPassword,
+  ) -> AppResult<bool> {
+    // Delete user's refresh tokens
+    sqlx::query(r#"DELETE FROM users.refresh_tokens WHERE user_id = $1"#)
+      .bind(user.pk_user_id)
+      .execute(&self.db)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    // Delete user's notification tokens
+    sqlx::query(r#"DELETE FROM users.notification_tokens WHERE user_id = $1"#)
+      .bind(user.pk_user_id)
+      .execute(&self.db)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    // Delete user's phone codes
+    sqlx::query(r#"DELETE FROM users.phone_codes WHERE user_id = $1"#)
+      .bind(user.pk_user_id)
+      .execute(&self.db)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    // Finally delete the user
+    let result = sqlx::query(r#"DELETE FROM users.tbl_users WHERE pk_user_id = $1"#)
+      .bind(user.pk_user_id)
+      .execute(&self.db)
+      .await
+      .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    if result.rows_affected() == 0 {
+      return Err(AppError::NotFound);
+    }
+
+    // Send notification to receptionists
+    let db = self.db.clone();
+    let user_full_name = user.full_name.clone().unwrap_or_default();
+    let user_phone = user.phone.clone().unwrap_or_default();
+    let user_avatar = user.avatar.clone();
+    tokio::spawn(async move {
+      // Delete avatar if exists
+      if let Some(avatar) = user_avatar {
+        let image_repo = Arc::new(LocalImageService);
+        if let Err(err) = image_repo.remove_old_image(avatar.as_str()).await {
+          tracing::error!("Failed to delete avatar: {:?}", err);
+        }
+      }
+      // Create notification
+      let notification_repo = SqlxNotificationRepository { db: db.clone() };
+      let notification = CreateNotification {
+        user_id: None,
+        title: "Tài khoản đã bị xóa".to_string(),
+        body: format!(
+          "Người dùng {} (SĐT: {}) đã xóa tài khoản của họ",
+          user_full_name, user_phone
+        ),
+        receiver: "ALLRECEPTIONIST".to_string(),
+        notification_type: "SYSTEM".to_string(),
+        data: Some(serde_json::json!({
+          "type": "SYSTEM",
+          "action": "ACCOUNT_DELETED",
+          "user_name": user_full_name,
+          "phone_number": user_phone
+        })),
+        appointment_id: None,
+      };
+
+      if let Err(err) = notification_repo.create(notification).await {
+        tracing::error!("Failed to create notification: {:?}", err);
+      }
+
+      // Send Firebase notification
+      let noti_token_repo = SqlxNotiTokenRepository { db: db.clone() };
+      let _ = send_firebase_notification(
+        &db,
+        std::sync::Arc::new(noti_token_repo),
+        0,
+        "Tài khoản đã bị xóa".to_string(),
+        format!("Người dùng {} (SĐT: {}) đã xóa tài khoản của họ", user_full_name, user_phone),
+        "ALLRECEPTIONIST".to_string(),
+        Some(serde_json::json!({
+          "type": "SYSTEM",
+          "action": "ACCOUNT_DELETED",
+          "user_name": user_full_name,
+          "phone_number": user_phone
+        })),
+      )
+      .await;
+    });
+
+    Ok(true)
   }
 }

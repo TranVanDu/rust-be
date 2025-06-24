@@ -1,5 +1,7 @@
 use super::notification_token::SqlxNotiTokenRepository;
-use crate::repositories::notification::SqlxNotificationRepository;
+use crate::repositories::{
+  appointment::common::get_membership_level, notification::SqlxNotificationRepository,
+};
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
 use domain::{
@@ -428,9 +430,12 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       amount_payment = amount_payment - payload.user_balance;
     }
 
-    let point = ((appointment.total_price as f64) / 1000.0).round() as i32;
+    let point = ((appointment.total_price as f64) / 1000.0).round() as i64;
 
     let mut tx = self.db.begin().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
+    let new_point = get_user.loyalty_points + point;
+    let member_ship = get_membership_level(new_point);
 
     if amount_payment > 0 {
       let _ = sqlx::query_as::<_, domain::entities::deposit::Deposit>(
@@ -478,11 +483,13 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       UPDATE users.tbl_users
       SET balance = balance - $1,
           loyalty_points = loyalty_points + $2
-      WHERE pk_user_id = $3
+          membership_level=$3    
+      WHERE pk_user_id = $4
       "#,
       )
       .bind(payload.user_balance)
       .bind(point)
+      .bind(member_ship)
       .bind(appointment.user_id)
       .execute(&mut *tx)
       .await
@@ -491,11 +498,12 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       sqlx::query(
         r#"
       UPDATE users.tbl_users
-      SET loyalty_points = loyalty_points + $1
-      WHERE pk_user_id = $2
+      SET loyalty_points = loyalty_points + $1, membership_level=$2
+      WHERE pk_user_id = $3
       "#,
       )
       .bind(point)
+      .bind(member_ship)
       .bind(appointment.user_id)
       .execute(&mut *tx)
       .await
@@ -754,7 +762,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
                   'full_name', u.full_name,
                   'phone', u.phone
                  ) as user
-          FROM users.appointments a
+          FROM users.appointments  a
           LEFT JOIN users.appointments_services aps ON a.id = aps.appointment_id
           LEFT JOIN users.service_items s ON aps.service_id = s.id
           LEFT JOIN users.tbl_users u ON a.user_id = u.pk_user_id

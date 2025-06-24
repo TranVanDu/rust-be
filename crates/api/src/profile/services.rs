@@ -171,3 +171,24 @@ pub async fn change_avatar_service(
 
   // Err(AppError::NotFound)
 }
+
+#[utoipa::path(
+    delete,
+    path = "/api/v1/profile/delete-account",
+    tag="Profile Service",
+    responses(
+        (status = 200, description = "Account deleted successfully", body = bool),
+        (status = 400, description = "Bad request", body = String),
+        (status = 500, description = "Internal server error", body = String)
+    )
+)]
+pub async fn delete_account(
+  State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
+) -> AppResult<Json<bool>> {
+  let profile_repo = SqlxProfileRepository { db: state.db.clone() };
+
+  let is_success = ProfileUseCase::delete_account(&profile_repo, user).await?;
+
+  Ok(Json(is_success))
+}

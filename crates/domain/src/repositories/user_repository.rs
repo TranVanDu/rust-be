@@ -1,6 +1,6 @@
 use crate::entities::user::{
-  CheckBalanceUser, PhoneFilterConvert, RequestCreateUser, RequestUpdateUser, User, UserFilter,
-  UserFilterConvert, UserWithPassword,
+  PhoneFilterConvert, RequestCreateUser, RequestUpdateUser, User, UserFilter, UserFilterConvert,
+  UserWithPassword,
 };
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};

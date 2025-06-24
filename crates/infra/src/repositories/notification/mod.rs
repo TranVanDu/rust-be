@@ -5,6 +5,7 @@ use domain::entities::common::PaginationMetadata;
 use domain::entities::notification::{
   CreateNotification, Notification, NotificationFilter, UpdateNotification,
 };
+use domain::entities::user::UserWithPassword;
 use domain::repositories::notification_repository::NotificationRepository;
 use modql::filter::ListOptions;
 use sqlx::PgPool;
@@ -123,8 +124,6 @@ impl NotificationRepository for SqlxNotificationRepository {
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
-    tracing::info!("Notifications: {:#?}", notifications);
-
     let total_items: i64 = sqlx::query_scalar(
       r#"
       SELECT COUNT(*) FROM users.notifications
@@ -180,5 +179,40 @@ impl NotificationRepository for SqlxNotificationRepository {
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
 
     Ok(result.rows_affected() > 0)
+  }
+
+  async fn un_read(
+    &self,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+  ) -> AppResult<i64> {
+    let user_role = user.role;
+
+    let count: i64 = sqlx::query_scalar(
+      r#"
+      SELECT COUNT(*) FROM users.notifications
+      WHERE (
+        user_id = $1
+        OR (
+          user_id IS NULL 
+          AND receiver = CASE 
+            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
+            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
+          END
+        )
+      )
+      AND ($2::boolean IS NULL OR is_read = $2)
+      AND ($4::text IS NULL OR notification_type = $4)
+      "#,
+    )
+    .bind(user.pk_user_id)
+    .bind(filter.is_read)
+    .bind(user_role)
+    .bind(filter.notification_type.clone())
+    .fetch_one(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    Ok(count)
   }
 }

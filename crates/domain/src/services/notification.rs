@@ -2,6 +2,7 @@ use crate::{
   entities::{
     common::PaginationMetadata,
     notification::{CreateNotification, Notification, NotificationFilter, UpdateNotification},
+    user::UserWithPassword,
   },
   repositories::notification_repository::NotificationRepository,
 };
@@ -42,5 +43,13 @@ impl NotificationUseCase {
     id: i64,
   ) -> AppResult<bool> {
     repo.delete(id).await
+  }
+
+  pub async fn un_read(
+    repo: &dyn NotificationRepository,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+  ) -> AppResult<i64> {
+    repo.un_read(user, filter).await
   }
 }

@@ -37,6 +37,7 @@ use utoipa_swagger_ui::SwaggerUi;
     api::profile::services::get_current_user,
     api::profile::services::update_profile_service,
     api::profile::services::change_avatar_service,
+    api::profile::services::delete_account,
 
     //services
     api::service::services::get_all_services,

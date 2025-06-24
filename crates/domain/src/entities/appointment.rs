@@ -29,7 +29,7 @@ pub struct Appointment {
 #[derive(Deserialize, FromRow, Debug, Clone, ToSchema, Serialize)]
 pub struct AppointmentExtra {
   pub id: i64,
-  pub user_id: i64,
+  pub user_id: Option<i64>,
   pub receptionist_id: Option<i64>,
   pub technician_id: Option<i64>,
   pub updated_by: Option<i64>,

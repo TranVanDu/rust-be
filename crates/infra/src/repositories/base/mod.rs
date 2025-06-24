@@ -348,3 +348,21 @@ pub fn generate_listoption(list_options: PaginationOptions) -> ListOptions {
 
   list_options
 }
+
+pub async fn pagination(
+  total_items: i64,
+  limit: u64,
+  offset: u64,
+) -> AppResult<PaginationMetadata> {
+  let total_pages = (total_items as f64 / limit as f64).ceil() as u64;
+  let current_page = (offset / limit) + 1;
+
+  let metadata = PaginationMetadata {
+    total_items: total_items as u64,
+    current_page: current_page as u64,
+    per_page: limit as u64,
+    total_pages,
+  };
+
+  Ok(metadata)
+}
