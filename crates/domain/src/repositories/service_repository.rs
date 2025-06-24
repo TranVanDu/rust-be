@@ -29,7 +29,6 @@ pub trait ServiceRepository: Send + Sync {
 
   async fn get_by_id(
     &self,
-    user: UserWithPassword,
     id: i64,
   ) -> AppResult<ServiceWithChild>;
 
@@ -41,7 +40,6 @@ pub trait ServiceRepository: Send + Sync {
 
   async fn get_services(
     &self,
-    user: UserWithPassword,
     filter: Option<ServiceFilterConvert>,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Service>, PaginationMetadata)>;

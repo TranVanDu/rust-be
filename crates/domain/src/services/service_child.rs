@@ -19,11 +19,10 @@ pub struct ServiceChildUseCase;
 impl ServiceChildUseCase {
   pub async fn get_by_id(
     service_child_repo: &dyn ServiceChildRepository,
-    user: UserWithPassword,
     parent_id: i64,
     id: i64,
   ) -> AppResult<ServiceChild> {
-    service_child_repo.get_by_id(user, parent_id, id).await
+    service_child_repo.get_by_id(parent_id, id).await
   }
 
   pub async fn delete_by_id(
@@ -36,12 +35,11 @@ impl ServiceChildUseCase {
 
   pub async fn get_services(
     service_child_repo: &dyn ServiceChildRepository,
-    user: UserWithPassword,
     parent_id: i64,
     filter: Option<ServiceChildFilterConvert>,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<ServiceChild>, PaginationMetadata)> {
-    service_child_repo.get_services(user, parent_id, filter, list_options).await
+    service_child_repo.get_services(parent_id, filter, list_options).await
   }
 
   pub async fn get_all_services(

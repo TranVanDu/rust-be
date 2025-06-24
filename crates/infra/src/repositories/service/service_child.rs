@@ -33,7 +33,6 @@ pub struct SqlxServiceChildRepository {
 impl ServiceChildRepository for SqlxServiceChildRepository {
   async fn get_by_id(
     &self,
-    _: UserWithPassword,
     parent_id: i64,
     id: i64,
   ) -> AppResult<ServiceChild> {
@@ -193,7 +192,6 @@ impl ServiceChildRepository for SqlxServiceChildRepository {
 
   async fn get_services(
     &self,
-    _: UserWithPassword,
     parent_id: i64,
     filter: Option<ServiceChildFilterConvert>,
     list_options: Option<ListOptions>,

@@ -36,11 +36,10 @@ use utils::pre_process::PreProcessR;
 )]
 pub async fn get_service(
   State(state): State<Arc<AppState>>,
-  Extension(user): Extension<UserWithPassword>,
   Path(id): Path<i64>,
 ) -> AppResult<Json<ServiceWithChild>> {
   let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let service = ServiceUseCase::get_by_id(&service_repo, user, id).await?;
+  let service = ServiceUseCase::get_by_id(&service_repo, id).await?;
 
   Ok(Json(service))
 }
@@ -64,7 +63,6 @@ pub async fn get_service(
 
 pub async fn get_services(
   State(state): State<Arc<AppState>>,
-  Extension(user): Extension<UserWithPassword>,
   Query(filter): Query<ServiceFilter>,
   Query(list_options): Query<PaginationOptions>,
 ) -> AppResult<Json<Value>> {
@@ -78,8 +76,7 @@ pub async fn get_services(
   let filter_convert = filter.clone().pre_process_r().await?;
   let service_repo = SqlxServiceRepository { db: state.db.clone() };
   let (services, pagination) =
-    ServiceUseCase::get_services(&service_repo, user, Some(filter_convert), Some(list_options))
-      .await?;
+    ServiceUseCase::get_services(&service_repo, Some(filter_convert), Some(list_options)).await?;
 
   let response = json!({
       "data": services,

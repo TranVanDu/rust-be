@@ -17,10 +17,9 @@ pub struct ServiceUseCase;
 impl ServiceUseCase {
   pub async fn get_by_id(
     service_repo: &dyn ServiceRepository,
-    user: UserWithPassword,
     id: i64,
   ) -> AppResult<ServiceWithChild> {
-    service_repo.get_by_id(user, id).await
+    service_repo.get_by_id(id).await
   }
 
   pub async fn delete_by_id(
@@ -33,11 +32,10 @@ impl ServiceUseCase {
 
   pub async fn get_services(
     service_repo: &dyn ServiceRepository,
-    user: UserWithPassword,
     filter: Option<ServiceFilterConvert>,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Service>, PaginationMetadata)> {
-    service_repo.get_services(user, filter, list_options).await
+    service_repo.get_services(filter, list_options).await
   }
 
   pub async fn get_all_services(service_repo: &dyn ServiceRepository) -> AppResult<Vec<Service>> {

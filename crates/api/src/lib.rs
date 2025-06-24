@@ -26,7 +26,8 @@ pub fn router_v1() -> Router<Arc<AppState>> {
 }
 
 pub fn router_v1_public() -> Router<Arc<AppState>> {
-  Router::new().nest("/api/v1", Router::new().merge(auth::routes()))
+  Router::new()
+    .nest("/api/v1", Router::new().merge(auth::routes()).merge(service::routes_service_pub()))
 }
 
 pub fn router_v0_private() -> Router<Arc<AppState>> {

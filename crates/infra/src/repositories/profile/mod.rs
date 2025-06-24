@@ -182,6 +182,15 @@ impl ProfileRepository for SqlxProfileRepository {
       .await
       .map_err(|err| AppError::Unhandled(Box::new(err)))?;
 
+    // Update user's appointments to CANCELLED if they are PENDING or CONFIRMED
+    sqlx::query(
+      r#"UPDATE users.appointments SET status = 'CANCELLED' WHERE user_id = $1 AND status IN ('PENDING', 'CONFIRMED')"#
+    )
+    .bind(user.pk_user_id)
+    .execute(&self.db)
+    .await
+    .map_err(|err| AppError::Unhandled(Box::new(err)))?;
+
     // Finally delete the user
     let result = sqlx::query(r#"DELETE FROM users.tbl_users WHERE pk_user_id = $1"#)
       .bind(user.pk_user_id)

@@ -8,7 +8,8 @@ use domain::{
   entities::{
     appointment::{
       Appointment, AppointmentExtra, AppointmentFilter, AppointmentWithServices,
-      CreateAppointmentRequest, PaymentAppointmentRequest, UpdateAppointmentRequest,
+      AppointmentWithUserDelete, CreateAppointmentRequest, PaymentAppointmentRequest,
+      UpdateAppointmentRequest,
     },
     common::PaginationMetadata,
     user::{User, UserWithPassword},
@@ -210,12 +211,14 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     }
 
     // Lấy thông tin cũ trước khi update
-    let old_appointment =
-      sqlx::query_as::<_, Appointment>(r#"SELECT * FROM users.appointments WHERE id = $1"#)
-        .bind(id)
-        .fetch_optional(&db)
-        .await?
-        .ok_or(AppError::NotFound)?;
+    let old_appointment: AppointmentWithUserDelete =
+      sqlx::query_as::<_, AppointmentWithUserDelete>(
+        r#"SELECT * FROM users.appointments WHERE id = $1"#,
+      )
+      .bind(id)
+      .fetch_optional(&db)
+      .await?
+      .ok_or(AppError::NotFound)?;
 
     let mut tx = db.begin().await.map_err(|err| AppError::Unhandled(Box::new(err)))?;
 
@@ -250,7 +253,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
       return Err(AppError::BadRequest("Final price cannot be negative".to_string()));
     }
 
-    let res = sqlx::query_as::<_, Appointment>(
+    let res: AppointmentWithUserDelete = sqlx::query_as::<_, AppointmentWithUserDelete>(
       r#"
         UPDATE users.appointments
         SET

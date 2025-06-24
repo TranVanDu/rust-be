@@ -32,7 +32,6 @@ pub struct SqlxServiceRepository {
 impl ServiceRepository for SqlxServiceRepository {
   async fn get_by_id(
     &self,
-    _: UserWithPassword,
     id: i64,
   ) -> AppResult<ServiceWithChild> {
     let service = sqlx::query_as::<_, Service>(
@@ -212,7 +211,6 @@ impl ServiceRepository for SqlxServiceRepository {
 
   async fn get_services(
     &self,
-    _: UserWithPassword,
     filter: Option<ServiceFilterConvert>,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Service>, PaginationMetadata)> {
