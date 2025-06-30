@@ -6,8 +6,8 @@ use utils::pre_process::PreProcessR;
 use crate::entities::{
   common::PaginationMetadata,
   service::{
-    CreateServiceRequest, Service, ServiceFilter, ServiceFilterConvert, ServiceWithChild,
-    UpdateServiceRequest,
+    CreateServiceRequest, Service, ServiceFilter, ServiceFilterCombo, ServiceFilterComboConvert,
+    ServiceFilterConvert, ServiceWithChild, UpdateServiceRequest,
   },
   user::UserWithPassword,
 };
@@ -44,7 +44,10 @@ pub trait ServiceRepository: Send + Sync {
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Service>, PaginationMetadata)>;
 
-  async fn get_all_services(&self) -> AppResult<Vec<Service>>;
+  async fn get_all_services(
+    &self,
+    combo_service: Option<bool>,
+  ) -> AppResult<Vec<Service>>;
 
   async fn get_all_services_with_children(&self) -> AppResult<Vec<ServiceWithChild>>;
 }
@@ -55,6 +58,17 @@ impl PreProcessR for ServiceFilter {
 
   async fn pre_process_r(self) -> AppResult<Self::Output> {
     Ok(convert_service_filter(self))
+  }
+}
+
+#[async_trait]
+impl PreProcessR for ServiceFilterCombo {
+  type Output = ServiceFilterComboConvert;
+
+  async fn pre_process_r(self) -> AppResult<Self::Output> {
+    Ok(ServiceFilterComboConvert {
+      combo_service: self.combo_service.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    })
   }
 }
 
@@ -75,5 +89,6 @@ fn convert_service_filter(filter: ServiceFilter) -> ServiceFilterConvert {
     price: filter.price.map(OpValsInt32::from),
     is_active: filter.is_active.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
     is_signature: filter.is_signature.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
+    combo_service: filter.combo_service.map(|i: bool| OpValsBool(vec![OpValBool::from(i)])),
   }
 }

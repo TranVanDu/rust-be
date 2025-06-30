@@ -219,7 +219,7 @@ fn default_role() -> Role {
 /// Số điểm dùng để uplevel thành viên
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Point {
-  GOLD = 5000,
-  DIAMOND = 10000,
-  VIP = 20000,
+  GOLD = 10000,
+  DIAMOND = 20000,
+  VIP = 50000,
 }

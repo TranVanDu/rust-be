@@ -22,6 +22,7 @@ pub struct ServiceChild {
   pub description: Option<String>,
   pub price: Option<i32>,
   pub image: Option<String>,
+  pub combo_service: bool,
   pub is_active: bool,
   pub is_signature: bool,
   pub service_type: Option<String>,
@@ -43,6 +44,7 @@ pub struct CreateServiceChildRequest {
   pub service_type: Option<String>,
   pub is_active: Option<bool>,
   pub is_signature: Option<bool>,
+  pub combo_service: Option<bool>,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub service_name_en: Option<String>,
@@ -71,6 +73,7 @@ pub struct UpdateServiceChildRequest {
   pub service_type: Option<String>,
   pub is_active: Option<bool>,
   pub is_signature: Option<bool>,
+  pub combo_service: Option<bool>,
   pub parent_service_id: Option<i64>,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
@@ -91,6 +94,7 @@ pub struct ServiceChildFilter {
   pub price: Option<i32>,
   pub is_active: Option<bool>,
   pub is_signature: Option<bool>,
+  pub combo_service: Option<bool>,
   pub service_name_en: Option<String>,
   pub service_name_ko: Option<String>,
   pub parent_service_id: Option<i64>,
@@ -102,6 +106,7 @@ pub struct ServiceChildFilterConvert {
   pub price: Option<OpValsInt32>,
   pub is_active: Option<OpValsBool>,
   pub is_signature: Option<OpValsBool>,
+  pub combo_service: Option<OpValsBool>,
   pub service_name_en: Option<OpValsString>,
   pub service_name_ko: Option<OpValsString>,
   pub parent_service_id: Option<OpValsInt64>,
@@ -120,6 +125,7 @@ pub struct ServiceChildWithParent {
   pub image: Option<String>,
   pub is_active: bool,
   pub is_signature: bool,
+  pub combo_service: bool,
   pub service_type: Option<String>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,

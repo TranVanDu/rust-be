@@ -30,6 +30,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+    volumes:
+      - ./uploads:/usr/src/app/uploads # Thêm bind mount cho uploads
 
   postgres:
     image: postgres:15-alpine

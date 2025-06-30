@@ -22,6 +22,7 @@ pub struct Service {
   pub image: Option<String>,
   pub is_active: bool,
   pub is_signature: bool,
+  pub combo_service: bool,
   pub service_type: Option<String>,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
@@ -40,6 +41,7 @@ pub struct CreateServiceRequest {
   pub service_type: Option<String>,
   pub is_active: Option<bool>,
   pub is_signature: Option<bool>,
+  pub combo_service: Option<bool>,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub service_name_en: Option<String>,
@@ -68,6 +70,7 @@ pub struct UpdateServiceRequest {
   pub service_type: Option<String>,
   pub is_active: Option<bool>,
   pub is_signature: Option<bool>,
+  pub combo_service: Option<bool>,
   #[serde(default)]
   #[serde(deserialize_with = "trim_option_string")]
   pub service_name_en: Option<String>,
@@ -87,8 +90,19 @@ pub struct ServiceFilter {
   pub price: Option<i32>,
   pub is_signature: Option<bool>,
   pub is_active: Option<bool>,
+  pub combo_service: Option<bool>,
   pub service_name_en: Option<String>,
   pub service_name_ko: Option<String>,
+}
+
+#[derive(FilterNodes, Deserialize, Default, Debug, Clone, IntoParams, ToSchema)]
+pub struct ServiceFilterCombo {
+  pub combo_service: Option<bool>,
+}
+
+#[derive(FilterNodes, Deserialize, Default, Debug, Clone)]
+pub struct ServiceFilterComboConvert {
+  pub combo_service: Option<OpValsBool>,
 }
 
 #[derive(FilterNodes, Deserialize, Default, Debug, Clone)]
@@ -97,6 +111,7 @@ pub struct ServiceFilterConvert {
   pub price: Option<OpValsInt32>,
   pub is_signature: Option<OpValsBool>,
   pub is_active: Option<OpValsBool>,
+  pub combo_service: Option<OpValsBool>,
   pub service_name_en: Option<OpValsString>,
   pub service_name_ko: Option<OpValsString>,
 }
@@ -115,6 +130,7 @@ pub struct ServiceWithChild {
   pub is_active: bool,
   pub service_type: Option<String>,
   pub is_signature: bool,
+  pub combo_service: bool,
   pub created_at: DateTime<Utc>,
   pub updated_at: DateTime<Utc>,
   pub child: Vec<ServiceChild>,

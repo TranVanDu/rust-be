@@ -1,8 +1,9 @@
 use axum::Extension;
 use axum::extract::{Path, Query};
 use axum::{Json, extract::State};
+use core_app::errors::AppError;
 use core_app::{AppResult, AppState};
-use domain::entities::common::{PaginationMetadata, PaginationOptions};
+use domain::entities::common::PaginationOptions;
 use domain::entities::notification::{
   CreateNotification, Notification, NotificationFilter, UpdateNotification,
 };
@@ -122,9 +123,14 @@ pub async fn get_by_id(
 )]
 pub async fn get_list(
   State(state): State<Arc<AppState>>,
+  Extension(user): Extension<UserWithPassword>,
   Query(filter): Query<NotificationFilter>,
   Query(list_options): Query<PaginationOptions>,
 ) -> AppResult<Json<Value>> {
+  if user.role != "ADMIN" {
+    return Err(AppError::Forbidden("Only admin can access this endpoint".to_string()));
+  }
+
   let list_options = ListOptions {
     limit: list_options.per_page.map(|limit| limit as i64),
     offset: list_options.page.map(|page| {
@@ -134,7 +140,8 @@ pub async fn get_list(
   };
   let repo = SqlxNotificationRepository { db: state.db.clone() };
 
-  let (token, pagination) = NotificationUseCase::list(&repo, filter, Some(list_options)).await?;
+  let (token, pagination) =
+    NotificationUseCase::list(&repo, user, filter, Some(list_options)).await?;
 
   let response = json!({
       "data": token,
@@ -175,27 +182,8 @@ pub async fn get_user_notifications(
   };
   let repo = SqlxNotificationRepository { db: state.db.clone() };
 
-  let (notifications, pagination) = match user.role.as_str() {
-    "RECEPTIONIST" | "TECHNICIAN" => {
-      let mut user_filter = filter.clone();
-      user_filter.user_id = Some(user.pk_user_id);
-      user_filter.receiver = Some(user.role.clone());
-      NotificationUseCase::list(&repo, user_filter, Some(list_options)).await?
-    },
-    "CUSTOMER" => {
-      let mut user_filter = filter.clone();
-      user_filter.user_id = Some(user.pk_user_id);
-      user_filter.receiver = Some("USER".to_string());
-      NotificationUseCase::list(&repo, user_filter, Some(list_options)).await?
-    },
-    _ => (vec![], PaginationMetadata {
-      total_items: 0,
-      total_pages: 0,
-      current_page: 1,
-      per_page: list_options.limit.unwrap_or(10) as u64,
-    }),
-  };
-
+  let (notifications, pagination) =
+    NotificationUseCase::list_for_user(&repo, user, filter, Some(list_options)).await?;
   let response = json!({
     "data": notifications,
     "metadata": pagination

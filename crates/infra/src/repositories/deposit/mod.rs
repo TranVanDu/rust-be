@@ -19,6 +19,7 @@ use domain::{
 };
 use modql::filter::ListOptions;
 use sqlx::PgPool;
+use utils::format_number::format_number;
 
 pub struct SqlxDepositRepository {
   pub db: PgPool,
@@ -80,8 +81,8 @@ impl DepositRepository for SqlxDepositRepository {
     let notification = CreateNotification {
       user_id: Some(request.user_id),
       title: "Nạp tiền thành công".to_string(),
-      body: format!("Bạn đã nạp thành công {} vào tài khoản", deposit.amount),
-      receiver: "USER".to_string(),
+      body: format!("Bạn đã nạp thành công {}đ vào tài khoản", format_number(deposit.amount)),
+      receiver: "CUSTOMER".to_string(),
       notification_type: "DEPOSIT".to_string(),
       data: Some(serde_json::json!({
         "type": "DEPOSIT",
@@ -104,8 +105,8 @@ impl DepositRepository for SqlxDepositRepository {
       std::sync::Arc::new(noti_token_repo),
       request.user_id,
       "Nạp tiền thành công".to_string(),
-      format!("Bạn đã nạp thành công {} vào tài khoản", deposit.amount),
-      "USER".to_string(),
+      format!("Bạn đã nạp thành công {}đ vào tài khoản", format_number(deposit.amount)),
+      "CUSTOMER".to_string(),
       Some(serde_json::json!({
         "type": "DEPOSIT",
         "deposit_id": deposit.id,
@@ -165,8 +166,8 @@ impl DepositRepository for SqlxDepositRepository {
       let notification = CreateNotification {
         user_id: Some(deposit.user_id),
         title: "Nạp tiền thành công".to_string(),
-        body: format!("Bạn đã nạp thành công {} vào tài khoản", deposit.amount),
-        receiver: "USER".to_string(),
+        body: format!("Bạn đã nạp thành công {}đ vào tài khoản", format_number(deposit.amount)),
+        receiver: "CUSTOMER".to_string(),
         notification_type: "DEPOSIT".to_string(),
         data: Some(serde_json::json!({
           "type": "DEPOSIT",
@@ -186,8 +187,8 @@ impl DepositRepository for SqlxDepositRepository {
         std::sync::Arc::new(noti_token_repo),
         deposit.user_id,
         "Nạp tiền thành công".to_string(),
-        format!("Bạn đã nạp thành công {} vào tài khoản", deposit.amount),
-        "USER".to_string(),
+        format!("Bạn đã nạp thành công {}đ vào tài khoản", format_number(deposit.amount)),
+        "CUSTOMER".to_string(),
         Some(serde_json::json!({
           "type": "DEPOSIT",
           "deposit_id": deposit.id,

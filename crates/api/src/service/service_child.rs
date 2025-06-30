@@ -190,6 +190,7 @@ pub async fn create_service(
     price: Some(0),
     is_active: Some(true),
     is_signature: Some(false),
+    combo_service: Some(false),
     service_type: None,
     image: None,
   };
@@ -266,6 +267,19 @@ pub async fn create_service(
             AppError::BadRequest(format!("Invalid is_signature format: {}", err))
           })?;
           payload.is_signature = Some(is_signature);
+        }
+      },
+      "combo_service" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let combo_service = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.combo_service = Some(combo_service);
         }
       },
       _ => {
@@ -393,6 +407,7 @@ pub async fn update_service(
     price: None,
     is_active: None,
     is_signature: None,
+    combo_service: None,
     service_type: None,
     image: None,
   };
@@ -469,6 +484,19 @@ pub async fn update_service(
             AppError::BadRequest(format!("Invalid is_signature format: {}", err))
           })?;
           payload.is_signature = Some(is_signature);
+        }
+      },
+      "combo_service" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let combo_service = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.combo_service = Some(combo_service);
         }
       },
       _ => {

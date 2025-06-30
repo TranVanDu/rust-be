@@ -20,6 +20,7 @@ use modql::filter::ListOptions;
 use serde_json;
 use sqlx::PgPool;
 use std::sync::Arc;
+use utils::format_number::format_number;
 pub mod common;
 pub mod send_noti;
 pub use crate::repositories::appointment::send_noti::*;
@@ -138,7 +139,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
     let mut type_send = "ALLRECEPTIONIST".to_string();
 
     if create_by_role == "RECEPTIONIST".to_string() {
-      type_send = "USER".to_string();
+      type_send = "CUSTOMER".to_string();
     }
     tokio::spawn(async move {
       match create_notification(
@@ -171,7 +172,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
           tech_id,
           "Phân công lịch hẹn".to_string(),
           format!("{} vừa đặt lịch hẹn thành công! Vui lòng vào kiểm tra. ", user_full_name),
-          type_send,
+          "TECHNICIAN".to_string(),
           Some(res.id),
           Some(serde_json::json!({
             "appointment_id": res.id,
@@ -485,7 +486,7 @@ impl AppointmentRepository for SqlxAppointmentRepository {
         r#"
       UPDATE users.tbl_users
       SET balance = balance - $1,
-          loyalty_points = loyalty_points + $2
+          loyalty_points = loyalty_points + $2,
           membership_level=$3    
       WHERE pk_user_id = $4
       "#,
@@ -548,9 +549,10 @@ impl AppointmentRepository for SqlxAppointmentRepository {
         "Thanh toán thành công".to_string(),
         format!(
           "Lịch hẹn của {} đã được thanh toán thành công. Bạn được nhận thêm vào {} điểm",
-          payload.full_name, point
+          payload.full_name,
+          format_number(point)
         ),
-        "USER".to_string(),
+        "CUSTOMER".to_string(),
         Some(result_clone.id),
         Some(serde_json::json!({
           "appointment_id": result_clone.id,

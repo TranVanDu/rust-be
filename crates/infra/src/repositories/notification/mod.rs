@@ -87,6 +87,7 @@ impl NotificationRepository for SqlxNotificationRepository {
 
   async fn list(
     &self,
+    _: UserWithPassword,
     filter: NotificationFilter,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Notification>, PaginationMetadata)> {
@@ -97,19 +98,10 @@ impl NotificationRepository for SqlxNotificationRepository {
     let notifications = sqlx::query_as::<_, Notification>(
       r#"
       SELECT * FROM users.notifications
-      WHERE (
-        (user_id = $1 AND receiver = $3)
-        OR (
-          user_id IS NULL 
-          AND receiver = CASE 
-            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
-            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
-            ELSE $3
-          END
-        )
-      )
-      AND ($2::boolean IS NULL OR is_read = $2)
-      AND ($4::text IS NULL OR notification_type = $4)
+      WHERE ($1::bigint IS NULL OR user_id = $1)
+        AND ($2::boolean IS NULL OR is_read = $2)
+        AND ($3::text IS NULL OR receiver = $3)
+        AND ($4::text IS NULL OR notification_type = $4)
       ORDER BY created_at DESC
       LIMIT $5 OFFSET $6
       "#,
@@ -127,25 +119,106 @@ impl NotificationRepository for SqlxNotificationRepository {
     let total_items: i64 = sqlx::query_scalar(
       r#"
       SELECT COUNT(*) FROM users.notifications
+      WHERE ($1::bigint IS NULL OR user_id = $1)
+        AND ($2::boolean IS NULL OR is_read = $2)
+        AND ($3::text IS NULL OR receiver = $3)
+        AND ($4::text IS NULL OR notification_type = $4)
+      "#,
+    )
+    .bind(filter.user_id)
+    .bind(filter.is_read)
+    .bind(filter.receiver.clone())
+    .bind(filter.notification_type.clone())
+    .fetch_one(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    let total_pages = (total_items as f64 / limit as f64).ceil() as u64;
+    let current_page = (offset / limit) + 1;
+
+    let metadata = PaginationMetadata {
+      total_items: total_items as u64,
+      current_page: current_page as u64,
+      per_page: limit as u64,
+      total_pages,
+    };
+
+    Ok((notifications, metadata))
+  }
+
+  async fn list_for_user(
+    &self,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<Notification>, PaginationMetadata)> {
+    let list_options = list_options.unwrap_or_default();
+    let limit = list_options.limit.unwrap_or(20).min(500);
+    let offset = list_options.offset.unwrap_or(0);
+    let user_role = user.role;
+
+    let notifications = sqlx::query_as::<_, Notification>(
+      r#"
+      SELECT * FROM users.notifications
       WHERE (
-        (user_id = $1 AND receiver = $3)
-        OR (
-          user_id IS NULL 
-          AND receiver = CASE 
-            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
-            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
-            ELSE $3
-          END
-        )
+        ($7 = 'CUSTOMER' AND  user_id = $1 AND receiver = 'CUSTOMER')
+        OR
+        ($7 = 'RECEPTIONIST' AND (
+        (user_id = $1 AND receiver = 'RECEPTIONIST')
+        OR receiver = 'ALLRECEPTIONIST'
+        ))
+        OR
+        ($7 = 'TECHNICIAN' AND (
+        (user_id = $1 AND receiver = 'TECHNICIAN')
+        OR receiver = 'ALLTECHNICIAN'
+        ))
+        OR
+        ($7 = 'ADMIN')
+      )
+      AND ($2::boolean IS NULL OR is_read = $2)
+      AND ($4::text IS NULL OR notification_type = $4)
+      ORDER BY created_at DESC
+      LIMIT $5 OFFSET $6
+      "#,
+    )
+    .bind(user.pk_user_id)
+    .bind(filter.is_read)
+    .bind(filter.receiver.clone())
+    .bind(filter.notification_type.clone())
+    .bind(limit)
+    .bind(offset)
+    .bind(user_role.clone())
+    .fetch_all(&self.db)
+    .await
+    .map_err(|err| AppError::BadRequest(err.to_string()))?;
+
+    let total_items: i64 = sqlx::query_scalar(
+      r#"
+      SELECT COUNT(*) FROM users.notifications
+      WHERE (
+        ($5 = 'CUSTOMER' AND  user_id = $1 AND receiver = 'CUSTOMER')
+        OR
+        ($5 = 'RECEPTIONIST' AND (
+        (user_id = $1 AND receiver = 'RECEPTIONIST')
+        OR receiver = 'ALLRECEPTIONIST'
+        ))
+        OR
+        ($5 = 'TECHNICIAN' AND (
+        (user_id = $1 AND receiver = 'TECHNICIAN')
+        OR receiver = 'ALLTECHNICIAN'
+        ))
+        OR
+        ($5 = 'ADMIN')
       )
       AND ($2::boolean IS NULL OR is_read = $2)
       AND ($4::text IS NULL OR notification_type = $4)
       "#,
     )
-    .bind(filter.user_id)
+    .bind(user.pk_user_id)
     .bind(filter.is_read)
     .bind(filter.receiver)
     .bind(filter.notification_type)
+    .bind(user_role)
     .fetch_one(&self.db)
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
@@ -192,14 +265,17 @@ impl NotificationRepository for SqlxNotificationRepository {
       r#"
       SELECT COUNT(*) FROM users.notifications
       WHERE (
-        user_id = $1
-        OR (
-          user_id IS NULL 
-          AND receiver = CASE 
-            WHEN $3 = 'RECEPTIONIST' THEN 'ALLRECEPTIONIST'
-            WHEN $3 = 'TECHNICIAN' THEN 'ALLTECHNICIAN'
-          END
-        )
+        ($3 = 'CUSTOMER' AND user_id = $1 AND receiver = 'CUSTOMER')
+        OR
+        ($3 = 'RECEPTIONIST' AND (
+          (user_id = $1 AND receiver = 'RECEPTIONIST')
+          OR receiver = 'ALLRECEPTIONIST'
+        ))
+        OR
+        ($3 = 'TECHNICIAN' AND (
+          (user_id = $1 AND receiver = 'TECHNICIAN')
+          OR receiver = 'ALLTECHNICIAN'
+        ))
       )
       AND ($2::boolean IS NULL OR is_read = $2)
       AND ($4::text IS NULL OR notification_type = $4)

@@ -33,10 +33,20 @@ impl NotificationUseCase {
   }
   pub async fn list(
     repo: &dyn NotificationRepository,
+    user: UserWithPassword,
     filter: NotificationFilter,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Notification>, PaginationMetadata)> {
-    repo.list(filter, list_options).await
+    repo.list(user, filter, list_options).await
+  }
+
+  pub async fn list_for_user(
+    repo: &dyn NotificationRepository,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<Notification>, PaginationMetadata)> {
+    repo.list_for_user(user, filter, list_options).await
   }
   pub async fn delete(
     repo: &dyn NotificationRepository,

@@ -84,7 +84,7 @@ pub async fn create_notification(
       // Gửi cho tất cả kỹ thuật viên
       tokens = get_token_technician(db).await?;
     },
-    "USER" => {
+    "CUSTOMER" => {
       // Gửi cho user cụ thể
       let t = noti_token_repo.get_token_by_user_id(user_id).await?;
       tokens = t.iter().map(|item| item.token.clone()).collect();
@@ -147,7 +147,7 @@ pub async fn send_firebase_notification(
       // Gửi cho tất cả kỹ thuật viên
       tokens = get_token_technician(db).await?;
     },
-    "USER" => {
+    "CUSTOMER" => {
       // Gửi cho user cụ thể
       let t = noti_token_repo.get_token_by_user_id(user_id).await?;
       tokens = t.iter().map(|item| item.token.clone()).collect();
@@ -382,7 +382,7 @@ pub async fn send_noti_update(
               user_id,
               title.clone(),
               body.clone(),
-              "USER".to_string(),
+              "CUSTOMER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
                 "type": "APPOINTMENT",
@@ -394,13 +394,22 @@ pub async fn send_noti_update(
 
             // Gửi cho kỹ thuật viên nếu đã được phân công
             if technician_id > 0 {
+              let mut t = title.clone();
+              let mut b = body.clone();
+              if t == "Lịch hẹn đã được xác nhận".to_string() {
+                t = "Phân công lịch hẹn".to_string();
+                b = format!(
+                  "Bạn đã được phân công cho lịch hẹn của {}. Thời gian: {}",
+                  user_full_name, res.start_time
+                )
+              }
               let _ = create_notification(
                 &db,
                 notification_repo.clone(),
                 noti_token_repo.clone(),
                 technician_id,
-                title.clone(),
-                body.clone(),
+                t,
+                b,
                 "TECHNICIAN".to_string(),
                 Some(res.id),
                 Some(serde_json::json!({
@@ -422,7 +431,7 @@ pub async fn send_noti_update(
               user_id,
               title.clone(),
               body.clone(),
-              "USER".to_string(),
+              "CUSTOMER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
                 "type": "APPOINTMENT",
@@ -442,7 +451,7 @@ pub async fn send_noti_update(
               user_id,
               title.clone(),
               body.clone(),
-              "USER".to_string(),
+              "CUSTOMER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
                 "type": "APPOINTMENT",
@@ -533,7 +542,7 @@ pub async fn send_noti_update(
             user_id,
             title.clone(),
             body.clone(),
-            "USER".to_string(),
+            "CUSTOMER".to_string(),
             Some(serde_json::json!({
               "type": "APPOINTMENT",
               "appointment_id": res.id,
@@ -557,7 +566,7 @@ pub async fn send_noti_update(
               user_id,
               title.clone(),
               body.clone(),
-              "USER".to_string(),
+              "CUSTOMER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
                 "type": "APPOINTMENT",
@@ -596,7 +605,7 @@ pub async fn send_noti_update(
               user_id,
               title.clone(),
               body.clone(),
-              "USER".to_string(),
+              "CUSTOMER".to_string(),
               Some(res.id),
               Some(serde_json::json!({
                 "type": "APPOINTMENT",
@@ -637,7 +646,7 @@ pub async fn send_noti_update(
           user_id,
           title.clone(),
           body.clone(),
-          "USER".to_string(),
+          "CUSTOMER".to_string(),
           Some(serde_json::json!({
             "type": "APPOINTMENT",
             "appointment_id": res.id,

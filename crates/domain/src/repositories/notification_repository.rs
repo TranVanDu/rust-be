@@ -25,6 +25,14 @@ pub trait NotificationRepository: Send + Sync {
   ) -> AppResult<Notification>;
   async fn list(
     &self,
+    user: UserWithPassword,
+    filter: NotificationFilter,
+    list_options: Option<ListOptions>,
+  ) -> AppResult<(Vec<Notification>, PaginationMetadata)>;
+
+  async fn list_for_user(
+    &self,
+    user: UserWithPassword,
     filter: NotificationFilter,
     list_options: Option<ListOptions>,
   ) -> AppResult<(Vec<Notification>, PaginationMetadata)>;

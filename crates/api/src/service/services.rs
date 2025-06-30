@@ -7,7 +7,8 @@ use domain::{
   entities::{
     common::{GetPaginationList, PaginationOptions},
     service::{
-      CreateServiceRequest, Service, ServiceFilter, ServiceWithChild, UpdateServiceRequest,
+      CreateServiceRequest, Service, ServiceFilter, ServiceFilterCombo, ServiceWithChild,
+      UpdateServiceRequest,
     },
     service_child::ServiceChild,
     user::UserWithPassword,
@@ -88,6 +89,9 @@ pub async fn get_services(
 #[utoipa::path(
     get,
     path = "/api/v1/services/list-all",
+     params(
+          ServiceFilterCombo
+        ),
     tag="Services",
     responses(
         (status = 200, description = "successfully", body = Vec<Service>),
@@ -96,9 +100,12 @@ pub async fn get_services(
     )
 )]
 
-pub async fn get_all_services(State(state): State<Arc<AppState>>) -> AppResult<Json<Vec<Service>>> {
+pub async fn get_all_services(
+  State(state): State<Arc<AppState>>,
+  Query(filter): Query<ServiceFilterCombo>,
+) -> AppResult<Json<Vec<Service>>> {
   let service_repo = SqlxServiceRepository { db: state.db.clone() };
-  let services = ServiceUseCase::get_all_services(&service_repo).await?;
+  let services = ServiceUseCase::get_all_services(&service_repo, filter.combo_service).await?;
 
   Ok(Json(services))
 }
@@ -138,6 +145,7 @@ pub async fn get_all_services_with_children(
       image: service.image,
       is_active: service.is_active,
       is_signature: service.is_signature,
+      combo_service: service.combo_service,
       service_type: Some("parent".to_string()),
       created_at: service.created_at,
       updated_at: service.updated_at,
@@ -157,6 +165,7 @@ pub async fn get_all_services_with_children(
       service_type: Some("child".to_string()),
       is_active: child.is_active,
       is_signature: child.is_signature,
+      combo_service: child.combo_service,
       created_at: child.created_at,
       updated_at: child.updated_at,
     }));
@@ -234,6 +243,7 @@ pub async fn create_service(
     price: Some(0),
     is_active: Some(true),
     is_signature: Some(false),
+    combo_service: Some(false),
     service_type: None,
     image: None,
   };
@@ -310,6 +320,19 @@ pub async fn create_service(
             AppError::BadRequest(format!("Invalid is_signature format: {}", err))
           })?;
           payload.is_signature = Some(is_signature);
+        }
+      },
+      "combo_service" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let combo_service = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.combo_service = Some(combo_service);
         }
       },
       _ => {
@@ -418,6 +441,7 @@ pub async fn update_service(
     description_ko: None,
     price: None,
     is_active: None,
+    combo_service: None,
     is_signature: None,
     service_type: None,
     image: None,
@@ -495,6 +519,19 @@ pub async fn update_service(
             AppError::BadRequest(format!("Invalid is_signature format: {}", err))
           })?;
           payload.is_signature = Some(is_signature);
+        }
+      },
+      "combo_service" => {
+        let value = field.text().await.map_err(|err| {
+          error!("Failed to read is_signature: {}", err);
+          AppError::BadRequest(format!("Failed to read is_signature: {}", err))
+        })?;
+        if !value.trim().is_empty() {
+          let combo_service = value.parse::<bool>().map_err(|err| {
+            error!("Invalid is_signature format: {}", err);
+            AppError::BadRequest(format!("Invalid is_signature format: {}", err))
+          })?;
+          payload.combo_service = Some(combo_service);
         }
       },
       _ => {

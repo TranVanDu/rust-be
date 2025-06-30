@@ -58,7 +58,7 @@ impl NotificationService {
         }
       }
 
-      tracing::info!("{:?}kdskjdhskjdhjksjdksjdkjskdjskdjksjd", message);
+      tracing::info!("{:?} message", message);
 
       let response = self
         .http_client
@@ -94,7 +94,7 @@ impl NotificationService {
         "Your appointment has been confirmed for {}",
         appointment_time.format("%Y-%m-%d %H:%M")
       ),
-      receiver: "USER".to_string(),
+      receiver: "CUSTOMER".to_string(),
       notification_type: "APPOINTMENT".to_string(),
       data: Some(serde_json::json!({
           "appointment_id": appointment_id,

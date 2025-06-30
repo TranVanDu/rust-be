@@ -1,10 +1,7 @@
 use async_trait::async_trait;
 use core_app::{AppResult, errors::AppError};
-
 use domain::{
-  entities::user::{
-    CheckBalanceUser, PhoneFilterConvert, RequestCreateUser, User, UserWithPassword,
-  },
+  entities::user::{PhoneFilterConvert, RequestCreateUser, User, UserWithPassword},
   repositories::user_repository::UserRepository,
 };
 

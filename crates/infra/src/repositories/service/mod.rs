@@ -65,6 +65,7 @@ impl ServiceRepository for SqlxServiceRepository {
       image: service.image,
       is_active: service.is_active,
       is_signature: service.is_signature,
+      combo_service: service.combo_service,
       service_type: service.service_type,
       created_at: service.created_at,
       updated_at: service.updated_at,
@@ -264,13 +265,18 @@ impl ServiceRepository for SqlxServiceRepository {
     Ok((entities, metadata))
   }
 
-  async fn get_all_services(&self) -> AppResult<Vec<Service>> {
+  async fn get_all_services(
+    &self,
+    combo_service: Option<bool>,
+  ) -> AppResult<Vec<Service>> {
     let services = sqlx::query_as::<_, Service>(
       r#"
     SELECT * FROM users.services
+    WHERE ($1::boolean IS NULL OR combo_service = $1)
     ORDER BY is_signature DESC, id ASC
     "#,
     )
+    .bind(combo_service)
     .fetch_all(&self.db)
     .await
     .map_err(|err| AppError::BadRequest(err.to_string()))?;
@@ -317,6 +323,7 @@ impl ServiceRepository for SqlxServiceRepository {
         is_active: service.is_active,
         is_signature: service.is_signature,
         service_type: service.service_type,
+        combo_service: service.combo_service,
         created_at: service.created_at,
         updated_at: service.updated_at,
         child: child_services,

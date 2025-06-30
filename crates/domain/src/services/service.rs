@@ -38,8 +38,11 @@ impl ServiceUseCase {
     service_repo.get_services(filter, list_options).await
   }
 
-  pub async fn get_all_services(service_repo: &dyn ServiceRepository) -> AppResult<Vec<Service>> {
-    service_repo.get_all_services().await
+  pub async fn get_all_services(
+    service_repo: &dyn ServiceRepository,
+    combo_service: Option<bool>,
+  ) -> AppResult<Vec<Service>> {
+    service_repo.get_all_services(combo_service).await
   }
 
   pub async fn get_all_services_with_children(
